@@ -5,7 +5,7 @@ import { defaultVoiceProvider } from "../integrations/voice";
 import { createEventTypes } from "../integrations/calcom";
 import { searchAndBuyNumber, attachNumberToTrunk } from "../integrations/twilio";
 import { importPhoneNumber } from "../integrations/retell";
-import { brokerFunctions, buildRegistration, registerShop } from "../integrations/n8nRegistry";
+import { agentFunctions, agentWebhookUrl, agentBaseUrl } from "../integrations/agentTools";
 import type { ShopConfig } from "../schemas";
 import { type AutoHandler, done, failed } from "./types";
 
@@ -43,18 +43,17 @@ export const provisionVoiceHandler: AutoHandler = async ({ shop }) => {
 
   const provider = defaultVoiceProvider();
   // Voice providers (Retell) require PUBLIC https URLs for tools/webhooks — they
-  // reject localhost. Only attach the broker tools + call webhook when a real
-  // public N8N_BROKER_URL is configured; otherwise create the agent bare (it can
-  // still answer and talk) and wire tools later once the broker is live.
-  const broker = process.env.N8N_BROKER_URL;
-  const brokerReady = !!broker && /^https:\/\//i.test(broker) && !/localhost|127\.0\.0\.1/.test(broker);
+  // reject localhost. Attach the native agent tools + call-events webhook (served
+  // by this app) whenever APP_URL is a public https URL; otherwise create the
+  // agent bare (it can still answer and talk) and wire tools on a later deploy.
+  const publicApp = agentBaseUrl() !== null;
   const { agentId } = await provider.createAgent({
     shopId: shop.id,
     systemPrompt: version.systemPrompt,
     voice: config.voice,
     greeting: config.greeting ?? "",
-    functions: brokerReady ? brokerFunctions(shop.id) : [],
-    webhookUrl: brokerReady ? `${broker}/call-events?client_id=${shop.id}` : "",
+    functions: publicApp ? agentFunctions(shop.id) : [],
+    webhookUrl: publicApp ? (agentWebhookUrl(shop.id) ?? "") : "",
   });
 
   await prisma.shop.update({ where: { id: shop.id }, data: { agentProvider: provider.name, agentId } });
@@ -108,19 +107,13 @@ export const registerPipelineHandler: AutoHandler = async ({ shop }) => {
   const blocked = gate(shop.subStatus);
   if (blocked) return failed(blocked);
 
-  // Per-shop ingest secret (platform-generated, not a vendor credential).
+  // Per-shop ingest secret (still used by the legacy /api/ingest/call endpoint).
+  // The native agent tools authenticate via a signed token instead, so there's
+  // no external registry to POST to anymore — the app IS the broker.
   let ingestSecret = shop.ingestSecret;
   if (!ingestSecret) {
     ingestSecret = crypto.randomBytes(24).toString("hex");
     await prisma.shop.update({ where: { id: shop.id }, data: { ingestSecret } });
   }
-
-  const version = await approvedVersion(shop.id);
-  if (!version) return failed("No approved version to register.");
-  const config = version.config as unknown as ShopConfig;
-
-  const fresh = await prisma.shop.findUnique({ where: { id: shop.id } });
-  const payload = buildRegistration(fresh!, config, ingestSecret);
-  const result = await registerShop(payload);
-  return done({ registered: result.registered });
+  return done({ ingestSecretReady: true });
 };

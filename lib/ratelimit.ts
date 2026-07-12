@@ -22,6 +22,7 @@ const limiters = {
   broker: make("broker", 300, "1 m"), // n8n broker lookups (keyed by client IP)
   forwarding: make("forwarding", 30, "1 m"), // forwarding-verified callbacks (by IP)
   demo: make("demo", 3, "10 m"), // public landing-page real demo calls, per IP
+  agentNotify: make("agentNotify", 8, "10 m"), // notify_owner SMS per shop (spam/cost guard)
 };
 
 /** Returns true if allowed, false if rate-limited. Fails open if Redis is down. */

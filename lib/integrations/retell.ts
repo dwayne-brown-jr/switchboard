@@ -40,6 +40,7 @@ function toRetellTools(args: CreateAgentArgs) {
     name: f.name,
     description: f.description,
     url: f.url,
+    ...(f.parameters ? { parameters: f.parameters } : {}),
     speak_during_execution: f.name === "check_availability",
     speak_after_execution: true,
   }));

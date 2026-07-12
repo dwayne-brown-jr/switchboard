@@ -65,3 +65,49 @@ export async function updateAvailability(_shopId: string, _config: ShopConfig): 
   // Availability schedules are attached to the user; a full implementation maps
   // config.hours → a Cal.com schedule. Left as a Phase-3 wiring point.
 }
+
+// --- Call-time booking (used by the native agent tool routes) ---------------
+// NOTE: Cal.com v2 wants a DIFFERENT cal-api-version per endpoint — slots want
+// 2024-09-04, bookings want 2024-08-13 (event-types use 2024-06-14 above). Do
+// NOT route these through the shared api() helper, which pins 2024-06-14.
+
+/** Open appointment slots for an event type over the next `days`. */
+export async function getSlots(eventTypeId: string, days = 7): Promise<unknown> {
+  if (!hasKey()) {
+    // Deterministic mock so dev/test flows return something sensible.
+    const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const iso = d.toISOString().slice(0, 10);
+    return { status: "success", data: { [iso]: [{ start: `${iso}T09:00:00.000Z` }, { start: `${iso}T13:00:00.000Z` }] }, mock: true };
+  }
+  const start = new Date().toISOString().slice(0, 10);
+  const end = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const res = await fetch(`${BASE}/slots?eventTypeId=${encodeURIComponent(eventTypeId)}&start=${start}&end=${end}`, {
+    headers: { Authorization: `Bearer ${process.env.CALCOM_API_KEY}`, "cal-api-version": "2024-09-04" },
+  });
+  if (!res.ok) throw new Error(`Cal.com slots failed (${res.status}): ${await res.text().catch(() => "")}`);
+  return res.json();
+}
+
+/** Book an appointment. Callers have no email, so we synthesize a stable one. */
+export async function createBooking(args: {
+  eventTypeId: string;
+  start: string;
+  name: string;
+  phone: string;
+  timezone: string | null;
+}): Promise<unknown> {
+  if (!hasKey()) return { status: "success", data: { id: `mock-booking-${Date.now().toString(36)}`, start: args.start }, mock: true };
+  const email = `caller+${(args.phone || "").replace(/\D/g, "") || "unknown"}@switchboard.app`;
+  const res = await fetch(`${BASE}/bookings`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.CALCOM_API_KEY}`, "Content-Type": "application/json", "cal-api-version": "2024-08-13" },
+    body: JSON.stringify({
+      eventTypeId: Number(args.eventTypeId),
+      start: args.start,
+      attendee: { name: args.name || "Phone caller", email, phoneNumber: args.phone || undefined, timeZone: args.timezone || "America/Chicago" },
+      metadata: { source: "switchboard" },
+    }),
+  });
+  if (!res.ok) throw new Error(`Cal.com booking failed (${res.status}): ${await res.text().catch(() => "")}`);
+  return res.json();
+}

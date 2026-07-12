@@ -12,7 +12,7 @@ export interface CreateAgentArgs {
   systemPrompt: string;
   voice: string;
   greeting: string;
-  /** Tool endpoints the agent calls (n8n broker). */
+  /** Tool endpoints the agent calls (native /api/agent routes). */
   functions: AgentFunction[];
   webhookUrl: string;
 }
@@ -21,6 +21,8 @@ export interface AgentFunction {
   name: "check_availability" | "create_booking" | "notify_owner";
   url: string;
   description: string;
+  /** JSON-schema of the args the LLM should extract and send. */
+  parameters?: { type: "object"; properties: Record<string, unknown>; required?: string[] };
 }
 
 export interface VoiceProvider {

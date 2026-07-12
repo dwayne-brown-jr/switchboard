@@ -1,0 +1,204 @@
+// Switchboard Platform — Prisma schema
+// Provider is `sqlite` because Turso/libSQL is SQLite-compatible; the runtime
+// connects through @prisma/adapter-libsql (see lib/db.ts) which works against
+// both a local `file:` url (dev) and a remote `libsql://` Turso url (prod).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth (better-auth managed tables). User carries our domain fields too.
+// ---------------------------------------------------------------------------
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  emailVerified Boolean  @default(false)
+  image         String?
+  isAdmin       Boolean  @default(false) // also enforced via ADMIN_EMAILS env
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shops    Shop[]
+  sessions Session[]
+  accounts Account[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Domain
+// ---------------------------------------------------------------------------
+model Shop {
+  id           String  @id @default(cuid()) // == client_id everywhere
+  ownerId      String
+  owner        User    @relation(fields: [ownerId], references: [id])
+  businessName String
+  vertical     String // auto | hvac | home_services
+  city         String?
+  timezone     String?
+  websiteUrl   String?
+  businessNumber String? // their existing published line
+  ownerMobile  String? // alerts
+  status       String  @default("onboarding") // onboarding | live | paused | canceled
+
+  // billing
+  stripeCustomerId String?
+  stripeSubId      String?
+  plan             String? // catch | front_desk | growth
+  subStatus        String? // trialing | active | past_due | canceled
+
+  // provisioned resources (non-secret IDs only)
+  agentProvider  String? // retell | vapi
+  agentId        String?
+  agentNumber    String? // the AI's phone number
+  twilioNumberSid String?
+  calEventTypeMap Json? // { service: eventTypeId }
+  a2pBrandSid    String?
+  a2pCampaignSid String?
+  a2pStatus      String? // not_started | submitted | approved | failed
+  liveVersionId  String?
+  ingestSecret   String? // per-shop secret for the call-ingest endpoint
+  digestOptOut   Boolean @default(false) // owner unsubscribed from the weekly digest
+
+  createdAt DateTime @default(now())
+
+  versions AgentVersion[]
+  run      OnboardingRun?
+  calls    CallRecord[]
+  auditLogs AuditLog[]
+}
+
+model AgentVersion {
+  id           String   @id @default(cuid())
+  shopId       String
+  shop         Shop     @relation(fields: [shopId], references: [id])
+  config       Json // structured business config (no secrets)
+  systemPrompt String
+  qaVerdict    String? // go | no_go
+  qaFlags      Json? // [{risk, fix}]
+  status       String   @default("draft") // draft | approved | live | archived
+  createdAt    DateTime @default(now())
+}
+
+model OnboardingRun {
+  id          String   @id @default(cuid())
+  shopId      String   @unique
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  status      String   @default("in_progress") // in_progress | waiting_user | live | failed
+  currentStep String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  steps       ProvisioningStep[]
+}
+
+model ProvisioningStep {
+  id       String        @id @default(cuid())
+  runId    String
+  run      OnboardingRun @relation(fields: [runId], references: [id])
+  key      String // see pipeline table
+  type     String // auto | user
+  status   String        @default("pending") // pending | running | done | waiting_user | failed | skipped
+  result   Json? // external IDs, logs, error message, task payload
+  attempts Int           @default(0)
+  updatedAt DateTime     @updatedAt
+
+  @@unique([runId, key])
+}
+
+model CallRecord {
+  id            String   @id @default(cuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  callId        String   @unique
+  timestamp     DateTime
+  afterHours    Boolean  @default(false)
+  durationSec   Int      @default(0)
+  callerPhone   String?
+  intent        String?
+  outcome       String? // booked | message | escalated | missed_recovered | no_action
+  booked        Boolean  @default(false)
+  service       String?
+  apptTime      String?
+  estJobValue   Int      @default(0)
+  hotJob        Boolean  @default(false)
+  recovered     Boolean  @default(false)
+  transcriptUrl String?
+  flags         Json?
+}
+
+model WebhookEvent {
+  id        String   @id // provider event id (stripe evt_..., etc.)
+  provider  String
+  createdAt DateTime @default(now())
+}
+
+// Captured errors / operational failures — the in-app observability feed.
+// Written by lib/observability.reportError() from the onRequestError hook,
+// provisioning failures, webhooks and jobs. Independent of Shop so shopless
+// (infra) errors are still recorded.
+model FailureEvent {
+  id        String   @id @default(cuid())
+  source    String // request | provisioning | webhook | job | manual
+  level     String   @default("error") // error | warn
+  message   String
+  route     String? // request path or route file
+  shopId    String? // optional correlation (no FK — errors outlive shops)
+  digest    String? // Next error digest / dedupe hint
+  detail    Json? // stack + context
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Audit log of owner-initiated changes (who/what/when) — Phase 3 hardening.
+model AuditLog {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id])
+  actorId   String? // user id, or null for system
+  action    String // e.g. "wizard.completed", "version.published", "shop.paused"
+  detail    Json?
+  createdAt DateTime @default(now())
+}

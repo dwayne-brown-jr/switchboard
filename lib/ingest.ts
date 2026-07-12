@@ -55,7 +55,10 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
 export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<string, number>): Record<string, unknown> {
   const b = (body ?? {}) as Record<string, unknown>;
   const c = ((b.call as Record<string, unknown>) ?? b) as Record<string, unknown>;
-  const analysis = (c.call_analysis as Record<string, unknown>) ?? {};
+  const ca = (c.call_analysis as Record<string, unknown>) ?? {};
+  // Retell puts our configured post-call fields under custom_analysis_data; fall
+  // back to the top level in case a payload delivers them flat.
+  const analysis = { ...(ca as Record<string, unknown>), ...((ca.custom_analysis_data as Record<string, unknown>) ?? {}) };
   const service = (analysis.service as string) ?? null;
   const outcome = analysis.booked ? "booked" : analysis.emergency ? "escalated" : analysis.message ? "message" : "no_action";
   return {
@@ -70,7 +73,7 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
     booked: !!analysis.booked,
     service,
     appt_time: (analysis.appt_time as string) || null,
-    est_job_value: Number((analysis.est_job_value as number) || (service ? valueMap[service] : 0) || 0),
+    est_job_value: Math.max(0, Math.round(Number((analysis.est_job_value as number) || (service ? valueMap[service] : 0) || 0)) || 0),
     hot_job: !!analysis.emergency,
     recovered: !!analysis.recovered,
     transcript_url: (c.recording_url as string) || null,

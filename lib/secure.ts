@@ -21,7 +21,13 @@ export function secretEquals(a: string | null | undefined, b: string | null | un
 /** Sign a payload with the app secret (unforgeable one-click links, e.g. email
  *  unsubscribe). Returns a short hex tag; verify with the constant-time compare. */
 export function signPayload(payload: string): string {
-  const secret = process.env.AUTH_SECRET || "dev-insecure-secret";
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    // Never sign with a source-known default in production — that would make
+    // every agent/unsubscribe token forgeable. Fail loudly instead.
+    if (process.env.NODE_ENV === "production") throw new Error("AUTH_SECRET must be set in production");
+    return crypto.createHmac("sha256", "dev-insecure-secret").update(payload).digest("hex").slice(0, 32);
+  }
   return crypto.createHmac("sha256", secret).update(payload).digest("hex").slice(0, 32);
 }
 

@@ -174,7 +174,11 @@ function BusinessStep({ data, update }: StepProps) {
               <button
                 key={v}
                 type="button"
-                onClick={() => update(reseedForVertical(data, v as Vertical))}
+                onClick={() => {
+                  // Re-tapping the already-selected type must NOT reseed — that
+                  // would wipe the owner's services/FAQs/emergency edits.
+                  if (data.vertical !== v) update(reseedForVertical(data, v as Vertical));
+                }}
                 className={`rounded-xl border p-4 text-left transition ${active ? "border-brand-500 bg-brand-50 ring-2 ring-brand-200" : "border-slate-200 hover:border-slate-300"}`}
               >
                 <div className="text-sm font-semibold text-slate-900">{def.label}</div>

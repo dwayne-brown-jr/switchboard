@@ -23,16 +23,23 @@ const limiters = {
   forwarding: make("forwarding", 30, "1 m"), // forwarding-verified callbacks (by IP)
   demo: make("demo", 3, "10 m"), // public landing-page real demo calls, per IP
   agentNotify: make("agentNotify", 8, "10 m"), // notify_owner SMS per shop (spam/cost guard)
+  agentTool: make("agentTool", 20, "1 m"), // check-availability / create-booking per shop
 };
 
-/** Returns true if allowed, false if rate-limited. Fails open if Redis is down. */
-export async function rateLimit(kind: keyof typeof limiters, id: string): Promise<boolean> {
+/**
+ * Returns true if allowed, false if rate-limited. By default FAILS OPEN if the
+ * limiter is unconfigured or Redis errors (so a limiter outage never blocks
+ * legitimate traffic). Pass { failClosed: true } for cost-bearing PUBLIC
+ * endpoints (e.g. the demo web-call), where "deny on outage" is safer than
+ * "unlimited spend on outage".
+ */
+export async function rateLimit(kind: keyof typeof limiters, id: string, opts?: { failClosed?: boolean }): Promise<boolean> {
   const limiter = limiters[kind];
-  if (!limiter) return true;
+  if (!limiter) return !opts?.failClosed;
   try {
     const { success } = await limiter.limit(id);
     return success;
   } catch {
-    return true; // never block on a rate-limiter outage
+    return !opts?.failClosed;
   }
 }

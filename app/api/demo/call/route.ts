@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isDemoType, resolveVars, demoAgentEnvKey, type DemoTypeId } from "@/lib/demo";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/clientip";
 
 // PUBLIC, unauthenticated: mints a Retell web-call access token for the landing
 // page's live demo. Abuse controls: strict per-IP rate limit (3 / 10 min),
@@ -16,8 +17,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (!(await rateLimit("demo", ip))) {
+  // Cost-bearing + fully public → fail CLOSED on a limiter outage, and key on
+  // the Vercel-trusted client IP (not spoofable x-forwarded-for).
+  if (!(await rateLimit("demo", clientIp(req), { failClosed: true }))) {
     return NextResponse.json({ error: "You've hit the demo limit — try again in a few minutes, or use the preview above." }, { status: 429 });
   }
 

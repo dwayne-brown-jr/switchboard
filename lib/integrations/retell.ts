@@ -8,6 +8,22 @@ import type { VoiceProvider, CreateAgentArgs } from "./voice";
 
 const BASE = "https://api.retellai.com";
 
+// Post-call analysis schema — tells Retell's post-call LLM to extract these into
+// call_analysis.custom_analysis_data, which /api/agent/call-events reads to build
+// the CallRecord (booked/emergency/service/value drive the dashboard + alerts).
+// Without this, those fields are never populated and every call reads no_action.
+export const POST_CALL_ANALYSIS = [
+  { type: "boolean", name: "booked", description: "True if the caller booked or confirmed an appointment on this call." },
+  { type: "boolean", name: "emergency", description: "True if the caller described an emergency or urgent situation." },
+  { type: "boolean", name: "message", description: "True if the call ended with a message taken for the owner (no booking, not an emergency)." },
+  { type: "boolean", name: "after_hours", description: "True if the call happened outside the business's normal hours." },
+  { type: "boolean", name: "recovered", description: "True if this was a missed call that was recovered (called/texted back)." },
+  { type: "string", name: "intent", description: "A short phrase for why the caller called (e.g. 'booking', 'price question')." },
+  { type: "string", name: "service", description: "The service the caller booked or asked about, if any." },
+  { type: "string", name: "appt_time", description: "The appointment time booked as ISO 8601, if any." },
+  { type: "number", name: "est_job_value", description: "Estimated dollar value of the booked job as a whole number, else 0." },
+];
+
 // Our curated voice ids ARE real Retell voice ids (see lib/verticals.ts VOICES),
 // so we pass them straight through. Fallback if a legacy/unknown id sneaks in.
 const DEFAULT_VOICE_ID = "11labs-Marissa";
@@ -129,6 +145,7 @@ export function createRetellProvider(): VoiceProvider {
         voice_id: voiceId(args.voice),
         agent_name: `sb_${args.shopId}`,
         ...(args.webhookUrl ? { webhook_url: args.webhookUrl } : {}),
+        post_call_analysis_data: POST_CALL_ANALYSIS,
         metadata: { shopId: args.shopId, llm_id: llm.llm_id },
       });
       return { agentId: agent.agent_id };

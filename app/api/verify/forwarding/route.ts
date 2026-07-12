@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { markVerified } from "@/lib/forwarding";
 import { secretEquals } from "@/lib/secure";
 import { rateLimit } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/clientip";
 
 // Called when the shop's agent receives the forwarded verification call (posted
 // by n8n / the voice provider). Authenticated by the shop's ingest secret so
@@ -10,7 +11,7 @@ import { rateLimit } from "@/lib/ratelimit";
 export async function POST(req: Request) {
   // Rate-limit by client IP before any lookup so the shopId+secret pair can't be
   // brute-forced from a single source.
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = clientIp(req);
   if (!(await rateLimit("forwarding", ip))) {
     return NextResponse.json({ error: "rate limited" }, { status: 429 });
   }

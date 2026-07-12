@@ -52,3 +52,22 @@ export function agentWebhookUrl(shopId: string): string | null {
   const app = agentBaseUrl();
   return app ? `${app}/api/agent/call-events${q(shopId)}` : null;
 }
+
+/**
+ * Resolve a caller-named service to a Cal.com event-type id: exact →
+ * case-insensitive → substring match. Only auto-picks when the shop has exactly
+ * ONE bookable service; otherwise returns undefined so the caller can decide
+ * whether to fall back (availability) or ask for clarification (booking).
+ */
+export function resolveEventType(map: Record<string, string>, service?: string): string | undefined {
+  if (service && service.trim()) {
+    if (map[service]) return map[service];
+    const lc = service.trim().toLowerCase();
+    const ci = Object.keys(map).find((k) => k.toLowerCase() === lc);
+    if (ci) return map[ci];
+    const partial = Object.keys(map).find((k) => k.toLowerCase().includes(lc) || lc.includes(k.toLowerCase()));
+    if (partial) return map[partial];
+  }
+  const vals = Object.values(map);
+  return vals.length === 1 ? vals[0] : undefined;
+}

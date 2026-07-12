@@ -14,10 +14,13 @@ import { type AutoHandler, done, failed } from "./types";
 // Every external id is persisted immediately after creation.
 
 async function approvedVersion(shopId: string) {
-  return (
-    (await prisma.agentVersion.findFirst({ where: { shopId, status: "approved" }, orderBy: { createdAt: "desc" } })) ??
-    (await prisma.agentVersion.findFirst({ where: { shopId }, orderBy: { createdAt: "desc" } }))
-  );
+  // Only provision a version that genuinely passed QA (approved) or is already
+  // live. NEVER fall back to "newest of any status" — that could push a draft
+  // that failed the QA gate to the real agent.
+  return prisma.agentVersion.findFirst({
+    where: { shopId, status: { in: ["approved", "live"] } },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 function gate(subStatus: string | null): string | null {

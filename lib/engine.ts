@@ -86,9 +86,14 @@ export async function advanceRun(runId: string) {
       where: { id: step.id },
       data: { status: "running", attempts: { increment: 1 } },
     });
-    await prisma.onboardingRun.update({ where: { id: run.id }, data: { currentStep: step.key } });
+    await prisma.onboardingRun.update({ where: { id: run.id }, data: { status: "in_progress", currentStep: step.key } });
 
-    const ctx: StepContext = { shop: run.shop, run, step };
+    // Re-fetch the shop before every auto step so each handler sees the writes
+    // made by prior steps in this same pass (e.g. provision_number needs the
+    // agentId that provision_voice just persisted). The `run.shop` snapshot is
+    // loaded once and would otherwise be stale mid-loop → number never routed.
+    const freshShop = await prisma.shop.findUnique({ where: { id: run.shopId } });
+    const ctx: StepContext = { shop: freshShop ?? run.shop, run, step };
     let result;
     try {
       result = await handler(ctx);
@@ -136,7 +141,7 @@ async function markFailed(stepId: string, runId: string, key: string, message: s
     where: { id: stepId },
     data: { status: "failed", result: { error: message, ...(data as object) } as never },
   });
-  await prisma.onboardingRun.update({ where: { id: runId }, data: { currentStep: key } });
+  await prisma.onboardingRun.update({ where: { id: runId }, data: { status: "failed", currentStep: key } });
   await notifyAdminStepFailed({ runId, key, message });
   const { reportError } = await import("./observability");
   await reportError(new Error(message), { source: "provisioning", route: `step:${key}`, extra: { runId, key, data } });

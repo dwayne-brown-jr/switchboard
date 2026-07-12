@@ -85,9 +85,17 @@ export async function confirmCheckout(sessionId: string) {
     },
   });
 
+  // Guard against racing the Stripe webhook (both complete the subscribe step
+  // and kick off provisioning). Only advance if the step isn't already done —
+  // otherwise a concurrent pass could double-provision (two numbers/agents).
   if (isPaying(sub?.status ?? "active") && shop.run) {
-    await logAudit(shop.id, user.id, "subscribe.completed", { plan: planId });
-    await completeUserStep(shop.run.id, "subscribe", { plan: planId });
+    const step = await prisma.provisioningStep.findUnique({
+      where: { runId_key: { runId: shop.run.id, key: "subscribe" } },
+    });
+    if (step && step.status !== "done") {
+      await logAudit(shop.id, user.id, "subscribe.completed", { plan: planId });
+      await completeUserStep(shop.run.id, "subscribe", { plan: planId });
+    }
   }
   redirect("/app");
 }

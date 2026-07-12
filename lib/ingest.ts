@@ -2,6 +2,7 @@ import "server-only";
 import type { Shop } from "@prisma/client";
 import { prisma } from "./db";
 import type { CallIngest } from "./schemas";
+import { fuzzyMatchKey } from "./match-service";
 
 // Shared call-recording core, used by BOTH the legacy /api/ingest/call endpoint
 // (authed by per-shop ingest secret) and the native /api/agent/call-events
@@ -61,6 +62,11 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
   const analysis = { ...(ca as Record<string, unknown>), ...((ca.custom_analysis_data as Record<string, unknown>) ?? {}) };
   const service = (analysis.service as string) ?? null;
   const outcome = analysis.booked ? "booked" : analysis.emergency ? "escalated" : analysis.message ? "message" : "no_action";
+  // Revenue fallback: the analysis `service` is often verbose free text ("routine
+  // oil change for my 2018 BMW"), so fuzzy-match it to a service_value_map key
+  // rather than exact lookup (which would miss → $0).
+  const valueKey = fuzzyMatchKey(Object.keys(valueMap), service);
+  const mappedValue = valueKey ? valueMap[valueKey] : 0;
   return {
     client_id: clientId,
     call_id: (c.call_id as string) || `call_${Date.now()}`,
@@ -73,7 +79,7 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
     booked: !!analysis.booked,
     service,
     appt_time: (analysis.appt_time as string) || null,
-    est_job_value: Math.max(0, Math.round(Number((analysis.est_job_value as number) || (service ? valueMap[service] : 0) || 0)) || 0),
+    est_job_value: Math.max(0, Math.round(Number((analysis.est_job_value as number) || mappedValue || 0)) || 0),
     hot_job: !!analysis.emergency,
     recovered: !!analysis.recovered,
     transcript_url: (c.recording_url as string) || null,

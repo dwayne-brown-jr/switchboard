@@ -60,14 +60,42 @@ export function agentWebhookUrl(shopId: string): string | null {
  * whether to fall back (availability) or ask for clarification (booking).
  */
 export function resolveEventType(map: Record<string, string>, service?: string): string | undefined {
+  const keys = Object.keys(map);
   if (service && service.trim()) {
     if (map[service]) return map[service];
     const lc = service.trim().toLowerCase();
-    const ci = Object.keys(map).find((k) => k.toLowerCase() === lc);
+    const ci = keys.find((k) => k.toLowerCase() === lc);
     if (ci) return map[ci];
-    const partial = Object.keys(map).find((k) => k.toLowerCase().includes(lc) || lc.includes(k.toLowerCase()));
-    if (partial) return map[partial];
+    // Token-overlap match (handles plurals/word order, e.g. "brakes" → "Brake
+    // service"). Only accept a UNIQUE best match — ties (a shared generic token
+    // like "service") stay unresolved so the caller asks to clarify.
+    const svc = new Set(tokens(service));
+    let best: string | undefined;
+    let bestScore = 0;
+    let tie = false;
+    for (const k of keys) {
+      const score = tokens(k).filter((t) => svc.has(t)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        best = k;
+        tie = false;
+      } else if (score === bestScore && score > 0) {
+        tie = true;
+      }
+    }
+    if (best && bestScore > 0 && !tie) return map[best];
   }
+  // Only auto-pick when there's exactly one bookable service.
   const vals = Object.values(map);
   return vals.length === 1 ? vals[0] : undefined;
+}
+
+/** Lowercase word tokens with trailing plural "s" stripped, for fuzzy matching. */
+function tokens(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/s$/, ""));
 }

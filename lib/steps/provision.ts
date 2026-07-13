@@ -57,6 +57,9 @@ export const provisionVoiceHandler: AutoHandler = async ({ shop }) => {
     greeting: config.greeting ?? "",
     functions: publicApp ? agentFunctions(shop.id) : [],
     webhookUrl: publicApp ? (agentWebhookUrl(shop.id) ?? "") : "",
+    // Live handoff target: the owner's mobile (a real human, and a line that is
+    // NOT forwarded to the agent — so a transfer can't loop back).
+    transferNumber: shop.ownerMobile ?? undefined,
   });
 
   await prisma.shop.update({ where: { id: shop.id }, data: { agentProvider: provider.name, agentId } });

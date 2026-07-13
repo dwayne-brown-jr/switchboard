@@ -148,7 +148,7 @@ export async function generatePrompt(config: ShopConfig): Promise<string> {
   try {
     const system =
       "You lightly polish a phone-receptionist script for readability. You MUST keep every " +
-      "section header (ROLE, DISCLOSURE, WHAT YOU KNOW, RULES, BOOKING FLOW, ESCALATION, CLOSING) " +
+      "section header (ROLE, DISCLOSURE, WHAT YOU KNOW, RULES, BOOKING FLOW, ESCALATION, HANDING OFF TO A PERSON, CLOSING) " +
       "and MUST keep all safety rules and numbers exactly. Do not add or remove rules. Return only the script.";
     const polished = await complete({
       system,
@@ -162,7 +162,7 @@ export async function generatePrompt(config: ShopConfig): Promise<string> {
   }
 }
 
-const REQUIRED_SECTIONS = ["ROLE", "DISCLOSURE", "WHAT YOU KNOW", "RULES", "BOOKING FLOW", "ESCALATION", "CLOSING"];
+const REQUIRED_SECTIONS = ["ROLE", "DISCLOSURE", "WHAT YOU KNOW", "RULES", "BOOKING FLOW", "ESCALATION", "HANDING OFF TO A PERSON", "CLOSING"];
 
 function hasAllSections(text: string): boolean {
   return REQUIRED_SECTIONS.every((s) => text.includes(s));
@@ -190,7 +190,7 @@ export function fillTemplate(config: ShopConfig): string {
     config.hot_job_rules.map((r) => `- ${r}`).join("\n") || "- Any situation the caller describes as an emergency.";
   const bookingFieldsText = config.booking_fields.map(prettyField).join(", ");
 
-  return template
+  const filled = template
     .replaceAll("{BUSINESS_NAME}", config.business_name ?? "the shop")
     .replaceAll("{CITY}", config.city ?? "the local area")
     .replaceAll("{SERVICE_AREA}", config.service_area ?? config.city ?? "the local area")
@@ -201,7 +201,20 @@ export function fillTemplate(config: ShopConfig): string {
     .replaceAll("{HOT_JOBS}", hotJobsText)
     .replaceAll("{BOOKING_FIELDS}", bookingFieldsText)
     .replaceAll("{ESCALATION_PHONE}", config.escalation.alert_number ?? "the shop owner");
+  return filled + HANDOFF_SECTION;
 }
+
+// Baked handoff guardrail (all verticals). Keeps the agent handling routine
+// calls itself and only reaching a human when it truly can't — after capturing
+// the caller's details so nothing is lost if the transfer isn't answered.
+const HANDOFF_SECTION = `
+
+HANDING OFF TO A PERSON
+Handle the call yourself whenever you reasonably can — booking, listed prices/hours, common questions, taking details. Only involve a human if the caller needs something you genuinely cannot do, or clearly asks to speak to a person.
+When you do:
+1. First collect their name, a callback number, and a one-line reason.
+2. Then tell them you'll connect them now and use the transfer option to reach the team. If you can't connect them, reassure them their details are saved and someone will call right back.
+Do NOT hand off for anything you can handle (scheduling, hours, prices in range, common questions).`;
 
 // ---------------------------------------------------------------------------
 // qaReview — the safety gate. Deterministic rule checks ALWAYS run and can

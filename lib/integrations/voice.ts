@@ -15,6 +15,9 @@ export interface CreateAgentArgs {
   /** Tool endpoints the agent calls (native /api/agent routes). */
   functions: AgentFunction[];
   webhookUrl: string;
+  /** If set, the agent can warm/cold-transfer the live call to this number (a
+   *  human at the business) when it can't handle the caller itself. */
+  transferNumber?: string;
 }
 
 export interface AgentFunction {

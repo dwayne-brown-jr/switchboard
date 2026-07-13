@@ -50,8 +50,8 @@ async function api<T>(path: string, method: string, body?: unknown): Promise<T> 
   return (await res.json()) as T;
 }
 
-function toRetellTools(args: CreateAgentArgs) {
-  return args.functions.map((f) => ({
+function toRetellTools(args: CreateAgentArgs): Record<string, unknown>[] {
+  const tools: Record<string, unknown>[] = args.functions.map((f) => ({
     type: "custom",
     name: f.name,
     description: f.description,
@@ -60,6 +60,20 @@ function toRetellTools(args: CreateAgentArgs) {
     speak_during_execution: f.name === "check_availability",
     speak_after_execution: true,
   }));
+  // Live human handoff — connect the caller to a person when the agent can't
+  // help. Cold transfer to the owner's number (must NOT be the forwarded
+  // business line, or it would loop back to the agent).
+  if (args.transferNumber) {
+    tools.push({
+      type: "transfer_call",
+      name: "transfer_to_human",
+      description:
+        "Connect the caller to a live person at the business. Use ONLY when the caller needs something you genuinely cannot do, or explicitly asks for a person — and only after collecting their name, callback number, and reason.",
+      transfer_destination: { type: "predefined", number: args.transferNumber },
+      transfer_option: { type: "cold_transfer" },
+    });
+  }
+  return tools;
 }
 
 /** Create a browser web call to an agent — lets an owner test the receptionist
@@ -133,7 +147,8 @@ export function createRetellProvider(): VoiceProvider {
     async createAgent(args: CreateAgentArgs) {
       // 1) Create the Retell LLM (holds the prompt + tools). Tools only when
       //    real (public) tool URLs exist — Retell rejects empty/localhost URLs.
-      const tools = args.functions.length ? { general_tools: toRetellTools(args) } : {};
+      const toolList = toRetellTools(args);
+      const tools = toolList.length ? { general_tools: toolList } : {};
       const llm = await api<{ llm_id: string }>("/create-retell-llm", "POST", {
         general_prompt: args.systemPrompt,
         begin_message: args.greeting,

@@ -32,4 +32,10 @@ describe("resolveEventType", () => {
     expect(resolveEventType({ "Deep clean": "9" }, undefined)).toBe("9");
     expect(resolveEventType({ "Deep clean": "9" }, "anything")).toBe("9");
   });
+
+  it("auto-picks when every service maps to the same (shared) event type", () => {
+    const shared = { "Oil change": "42", "Brake service": "42", "A/C service": "42" };
+    expect(resolveEventType(shared, undefined)).toBe("42");
+    expect(resolveEventType(shared, "something unmatched")).toBe("42");
+  });
 });

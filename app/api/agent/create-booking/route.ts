@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       name: a.customer_name || a.name || "",
       phone: a.phone || "",
       timezone: shop.timezone,
+      service: a.service || "",
     });
     return NextResponse.json({ booked: true, booking });
   } catch (e) {

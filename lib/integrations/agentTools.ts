@@ -63,7 +63,9 @@ export function agentWebhookUrl(shopId: string): string | null {
 export function resolveEventType(map: Record<string, string>, service?: string): string | undefined {
   const key = fuzzyMatchKey(Object.keys(map), service);
   if (key) return map[key];
-  // No match — only auto-pick when there's exactly one bookable service.
-  const vals = Object.values(map);
-  return vals.length === 1 ? vals[0] : undefined;
+  // No name match — auto-pick only when the map resolves to a SINGLE event type
+  // (either one service, or the new model where every service maps to the one
+  // shared appointment event type). Genuinely distinct types stay ambiguous.
+  const uniq = new Set(Object.values(map));
+  return uniq.size === 1 ? [...uniq][0] : undefined;
 }

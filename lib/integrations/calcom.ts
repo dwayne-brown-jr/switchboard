@@ -30,7 +30,14 @@ async function api<T>(path: string, method: string, body?: unknown): Promise<T> 
 }
 
 /**
- * Create/ensure an event type per bookable service. Returns { service: id }.
+ * Create ONE appointment event type for the shop and map every bookable service
+ * to it. Returns { service: id } (all services → the same id) so the rest of the
+ * code is unchanged. Why one, not one-per-service: Cal.com's slots endpoint only
+ * subtracts bookings made on the SAME event type, while the booking endpoint
+ * enforces a user-level busy check — so per-service event types let the agent
+ * offer a slot that's actually blocked by another service's booking, then fail.
+ * A single event type makes availability reflect ALL of the shop's bookings.
+ * (Cross-SHOP isolation still needs per-shop Cal.com users — a separate change.)
  * Idempotent at the handler level (the map is stored on the shop and reused).
  */
 export async function createEventTypes(
@@ -41,21 +48,19 @@ export async function createEventTypes(
   const map: Record<string, string> = {};
 
   if (!hasKey()) {
-    // Mock: deterministic ids so retries never double-create.
-    bookable.forEach((s, i) => (map[s.service] = `sb-${shopId}-${slugify(s.service)}-${i}`));
+    const id = `sb-${shopId}-appt`;
+    bookable.forEach((s) => (map[s.service] = id));
     return map;
   }
 
-  for (const s of bookable) {
-    const slug = `sb-${shopId}-${slugify(s.service)}`;
-    const created = await api<{ data: { id: number } }>("/event-types", "POST", {
-      title: `${config.business_name} — ${s.service}`,
-      slug,
-      lengthInMinutes: 60,
-      description: `Booking for ${s.service}`,
-    });
-    map[s.service] = String(created.data.id);
-  }
+  const created = await api<{ data: { id: number } }>("/event-types", "POST", {
+    title: `${config.business_name ?? "Appointment"} — Appointment`,
+    slug: `sb-${shopId}-appointment`,
+    lengthInMinutes: 60,
+    description: "Book an appointment.",
+  });
+  const id = String(created.data.id);
+  for (const s of bookable) map[s.service] = id;
   return map;
 }
 
@@ -149,17 +154,21 @@ export async function createBooking(args: {
   name: string;
   phone: string;
   timezone: string | null;
+  service?: string;
 }): Promise<unknown> {
   if (!hasKey()) return { status: "success", data: { id: `mock-booking-${Date.now().toString(36)}`, start: args.start }, mock: true };
   const email = `caller+${(args.phone || "").replace(/\D/g, "") || "unknown"}@switchboard.app`;
+  const svc = (args.service || "").slice(0, 60);
   const res = await fetch(`${BASE}/bookings`, {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.CALCOM_API_KEY}`, "Content-Type": "application/json", "cal-api-version": "2024-08-13" },
     body: JSON.stringify({
       eventTypeId: Number(args.eventTypeId),
       start: args.start,
-      attendee: { name: args.name || "Phone caller", email, phoneNumber: args.phone || undefined, timeZone: args.timezone || "America/Chicago" },
-      metadata: { source: "switchboard" },
+      attendee: { name: args.name ? `${args.name}${svc ? ` (${svc})` : ""}` : "Phone caller", email, phoneNumber: args.phone || undefined, timeZone: args.timezone || "America/Chicago" },
+      // Capture the requested service so the shop sees it on the booking (the
+      // event type itself is a generic "Appointment").
+      metadata: { source: "switchboard", ...(svc ? { service: svc } : {}) },
     }),
   });
   if (!res.ok) throw new Error(`Cal.com booking failed (${res.status}): ${await res.text().catch(() => "")}`);

@@ -27,6 +27,38 @@ model User {
   shops    Shop[]
   sessions Session[]
   accounts Account[]
+  devices  DeviceToken[]
+}
+
+// ---------------------------------------------------------------------------
+// Owner mobile app (Phase 0). Auth is a parallel, token-based path for native
+// clients (better-auth's cookie sessions don't fit native): an email-OTP login
+// (MobileAuthCode) exchanges for a long-lived, revocable device credential
+// (DeviceToken). The bearer token sent by the app is an HMAC over the device id
+// (lib/mobileAuth), so it can't be forged, and deleting the row revokes it.
+// ---------------------------------------------------------------------------
+model DeviceToken {
+  id         String   @id @default(cuid()) // == the device id embedded in the bearer token
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushToken  String? // Expo push token (ExponentPushToken[...]) for notifications
+  platform   String? // ios | android
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([pushToken])
+}
+
+model MobileAuthCode {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String // sha256 of the 6-digit code — never stored in the clear
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }
 
 model Session {

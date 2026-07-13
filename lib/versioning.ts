@@ -4,6 +4,7 @@ import { prisma } from "./db";
 import { generateConfig, generatePrompt, qaReview } from "./llm";
 import { wizardSchema, type WizardData, type ShopConfig, type QaResult } from "./schemas";
 import { getVoiceProvider } from "./integrations/voice";
+import { toE164 } from "./phone";
 import { logAudit } from "./audit";
 
 // Post-launch edits: every change becomes a new AgentVersion that must pass QA
@@ -47,7 +48,9 @@ export async function createDraft(shopId: string, wizardInput: unknown, actorId?
   // Owner mobile is a contact detail (alerts + live-handoff target), not agent
   // behavior — persist it to the shop immediately so it's current even before
   // publish. The live agent's transfer number is synced at publish time.
-  await prisma.shop.update({ where: { id: shopId }, data: { ownerMobile: wizard.ownerMobile?.trim() || null } });
+  // Normalize to E.164 on save so the transfer target + booking SMS always get
+  // a valid number (fall back to the raw value only if it can't be parsed).
+  await prisma.shop.update({ where: { id: shopId }, data: { ownerMobile: toE164(wizard.ownerMobile) ?? (wizard.ownerMobile?.trim() || null) } });
 
   // Replace any existing un-published draft so history stays clean.
   await prisma.agentVersion.deleteMany({ where: { shopId, status: "draft" } });

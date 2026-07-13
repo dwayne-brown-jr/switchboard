@@ -4,7 +4,6 @@ import { prisma } from "./db";
 import { generateConfig, generatePrompt, qaReview } from "./llm";
 import { wizardSchema, type WizardData, type ShopConfig, type QaResult } from "./schemas";
 import { getVoiceProvider } from "./integrations/voice";
-import { updateAvailability } from "./integrations/calcom";
 import { logAudit } from "./audit";
 
 // Post-launch edits: every change becomes a new AgentVersion that must pass QA
@@ -87,9 +86,8 @@ export async function publishVersion(shopId: string, versionId: string, actorId?
     // (best-effort — a stale transfer number shouldn't block a settings publish).
     await provider.updateTransferNumber?.(shop.agentId, shop.ownerMobile).catch(() => {});
   }
-  // Sync the shop's hours into its Cal.com schedule so edited hours actually
-  // change what the agent offers (best-effort).
-  await updateAvailability(shopId, config, Object.values((shop.calEventTypeMap as Record<string, string> | null) ?? {}), shop.timezone).catch(() => {});
+  // Edited hours take effect immediately: availability is computed live from the
+  // published config (lib/scheduling), so there's no external calendar to sync.
 
   await prisma.agentVersion.updateMany({ where: { shopId, status: "live" }, data: { status: "archived" } });
   await prisma.agentVersion.update({ where: { id: version.id }, data: { status: "live" } });

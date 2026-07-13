@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { authAgentShop } from "@/lib/agentAuth";
-import { createBooking } from "@/lib/integrations/calcom";
-import { resolveEventType } from "@/lib/integrations/agentTools";
+import { getLiveConfig, createConfirmedBooking } from "@/lib/booking";
 import { naiveLocalToUtc } from "@/lib/datetime";
 import { rateLimit } from "@/lib/ratelimit";
 
-// Agent tool: book an appointment once the caller confirms a time.
+// Agent tool: book an appointment once the caller confirms a time. The slot is
+// re-validated against this shop's hours + own bookings (in a transaction) so we
+// never confirm a time that's closed, past, or already taken.
 export async function POST(req: Request) {
   const shop = await authAgentShop(new URL(req.url));
   if (!shop) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -15,30 +16,32 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as { args?: Record<string, string>; [k: string]: unknown };
   const a = (body.args ?? body ?? {}) as Record<string, string>;
-  const map = (shop.calEventTypeMap as Record<string, string> | null) ?? {};
-
-  // Strict: never silently book the wrong service. If the caller named a service
-  // that doesn't resolve (and the shop has more than one), ask to confirm.
-  const eventTypeId = resolveEventType(map, a.service);
   const rawStart = a.preferred_time || a.start;
-  if (!eventTypeId) {
-    return NextResponse.json({ booked: false, message: "Which service should I book you for?" });
-  }
   if (!rawStart) {
     return NextResponse.json({ booked: false, message: "What day and time works for you?" });
   }
 
-  const start = naiveLocalToUtc(rawStart, shop.timezone);
   try {
-    const booking = await createBooking({
-      eventTypeId,
-      start,
-      name: a.customer_name || a.name || "",
-      phone: a.phone || "",
+    const config = await getLiveConfig(shop.id);
+    if (!config) {
+      return NextResponse.json({ booked: false, message: "Booking isn't set up yet — the team will follow up." });
+    }
+    const now = new Date();
+    const startUtc = new Date(naiveLocalToUtc(rawStart, shop.timezone));
+    const result = await createConfirmedBooking({
+      shopId: shop.id,
+      config,
       timezone: shop.timezone,
-      service: a.service || "",
+      startUtc,
+      now,
+      service: a.service,
+      customerName: a.customer_name || a.name,
+      customerPhone: a.phone,
     });
-    return NextResponse.json({ booked: true, booking });
+    if (!result.ok) {
+      return NextResponse.json({ booked: false, message: "That time isn't open — would another time work?" });
+    }
+    return NextResponse.json({ booked: true, booking: result.booking });
   } catch (e) {
     const { reportError } = await import("@/lib/observability");
     await reportError(e, { source: "request", route: "/api/agent/create-booking", shopId: shop.id });

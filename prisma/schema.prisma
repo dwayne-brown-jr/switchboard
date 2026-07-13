@@ -94,7 +94,7 @@ model Shop {
   agentId        String?
   agentNumber    String? // the AI's phone number
   twilioNumberSid String?
-  calEventTypeMap Json? // { service: eventTypeId }
+  calEventTypeMap Json? // LEGACY (pre-owned-scheduling Cal.com event-type map); unused — availability is now computed from config hours + own Booking rows
   a2pBrandSid    String?
   a2pCampaignSid String?
   a2pStatus      String? // not_started | submitted | approved | failed
@@ -107,7 +107,30 @@ model Shop {
   versions AgentVersion[]
   run      OnboardingRun?
   calls    CallRecord[]
+  bookings Booking[]
   auditLogs AuditLog[]
+}
+
+// Appointments we own. Switchboard computes availability from the shop's hours
+// minus THIS shop's own bookings — so shops never collide on a shared calendar
+// (the old single-Cal.com-user model let shop A's booking block shop B at the
+// same clock-time). Each row is a fixed-length slot; times are stored as UTC
+// instants (startUtc/endUtc) and rendered in the shop's timezone.
+model Booking {
+  id            String   @id @default(cuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  startUtc      DateTime
+  endUtc        DateTime
+  service       String?
+  customerName  String?
+  customerPhone String?
+  status        String   @default("confirmed") // confirmed | canceled
+  source        String   @default("agent") // agent | manual
+  callId        String? // the call that created it, if any
+  createdAt     DateTime @default(now())
+
+  @@index([shopId, startUtc])
 }
 
 model AgentVersion {

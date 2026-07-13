@@ -6,10 +6,12 @@ import type { ProvisioningStep } from "@prisma/client";
 // Owner-facing steps only — the technical auto-steps are collapsed into the
 // friendly "Build your receptionist" group so the list reads like a to-do list.
 const OWNER_STEPS = [
+  // "account" is always done — the list deliberately never starts at zero.
+  { key: "account", label: "Create your account" },
   { key: "wizard", label: "Tell us about your shop" },
-  { key: "generate_config", label: "Build & quality-check your receptionist", groupWith: ["generate_prompt", "qa_review"] },
-  { key: "subscribe", label: "Start your subscription" },
-  { key: "provision_voice", label: "We set everything up", groupWith: ["provision_calendar", "provision_number", "register_pipeline"] },
+  { key: "generate_config", label: "Build & quality-check your receptionist", groupWith: ["generate_prompt", "qa_review", "provision_voice"] },
+  { key: "subscribe", label: "Hear it & start your subscription" },
+  { key: "provision_calendar", label: "We set everything up", groupWith: ["provision_number", "register_pipeline"] },
   { key: "test_agent", label: "Give it a test call" },
   { key: "forwarding", label: "Forward your calls" },
   { key: "a2p", label: "Turn on texting (background)" },
@@ -30,16 +32,29 @@ function groupStatus(map: StepMap, keys: string[]): ProvisioningStep["status"] {
 export function SetupChecklist({ steps }: { steps: ProvisioningStep[] }) {
   const map: StepMap = Object.fromEntries(steps.map((s) => [s.key, s]));
 
+  const items = OWNER_STEPS.map((item) => {
+    const keys = [item.key, ...(("groupWith" in item && item.groupWith) || [])];
+    return { ...item, status: groupStatus(map, keys) };
+  });
+  const doneCount = items.filter((i) => i.status === "done").length;
+  const pct = Math.round((doneCount / items.length) * 100);
+
   return (
     <div className="card p-6">
-      <h2 className="text-base font-semibold text-slate-900">Your setup checklist</h2>
-      <p className="mt-1 text-sm text-slate-500">A few steps and your receptionist is live.</p>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-base font-semibold text-slate-900">Your setup checklist</h2>
+        <span className="text-sm font-medium text-brand-700">
+          {doneCount} of {items.length} done
+        </span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${Math.max(pct, 4)}%` }} />
+      </div>
+      <p className="mt-2 text-sm text-slate-500">A few steps and your receptionist is live.</p>
       <ol className="mt-5 space-y-1">
-        {OWNER_STEPS.map((item) => {
-          const keys = [item.key, ...(("groupWith" in item && item.groupWith) || [])];
-          const status = groupStatus(map, keys);
+        {items.map((item) => {
           const isPhase2 = PIPELINE.find((p) => p.key === item.key)?.phase === 2;
-          return <ChecklistItem key={item.key} label={item.label} status={status} stepKey={item.key} isPhase2={isPhase2} />;
+          return <ChecklistItem key={item.key} label={item.label} status={item.status} stepKey={item.key} isPhase2={isPhase2} />;
         })}
       </ol>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { DEMO_TYPES, demoType, resolveVars, type DemoTypeId, type Line } from "@/lib/demo";
 
@@ -8,8 +9,11 @@ type Phase = "idle" | "connecting" | "live" | "error";
 export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
   const [type, setType] = useState<DemoTypeId>("auto");
   const [phase, setPhase] = useState<Phase>("idle");
-  const [form, setForm] = useState({ business: "", city: "", service: "" });
+  // Pre-filled with a real example so the demo works with zero typing —
+  // editing "makes it yours" instead of filling a blank form.
+  const [form, setForm] = useState({ ...demoType("auto").defaults });
   const [lines, setLines] = useState<Line[]>([]);
+  const [hasTalked, setHasTalked] = useState(false);
   const [error, setError] = useState("");
   const clientRef = useRef<{ stopCall: () => void } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -21,6 +25,20 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
     return () => clientRef.current?.stopCall();
   }, []);
 
+  // Remember what the visitor typed (only their own edits, never our example
+  // values) so the setup wizard can start pre-filled if they sign up.
+  useEffect(() => {
+    try {
+      const saved: Record<string, string> = {};
+      const business = form.business.trim();
+      const city = form.city.trim();
+      if (business && business !== def.defaults.business) saved.business = business;
+      if (city && city !== def.defaults.city) saved.city = city;
+      if (Object.keys(saved).length) localStorage.setItem("sb-demo", JSON.stringify({ ...saved, vertical: type }));
+      else localStorage.removeItem("sb-demo");
+    } catch {}
+  }, [form, type, def.defaults.business, def.defaults.city]);
+
   // Auto-scroll the transcript as it grows.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -30,7 +48,7 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
     clientRef.current?.stopCall();
     clientRef.current = null;
     setType(id);
-    setForm({ business: "", city: "", service: "" });
+    setForm({ ...demoType(id).defaults });
     setLines([]);
     setError("");
     setPhase("idle");
@@ -60,6 +78,7 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
       client.on("call_started", () => setPhase("live"));
       client.on("call_ended", () => {
         setPhase("idle");
+        setHasTalked(true);
         clientRef.current = null;
       });
       client.on("update", (u: { transcript?: { role: string; content: string }[] }) => {
@@ -84,6 +103,7 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
     clientRef.current?.stopCall();
     clientRef.current = null;
     setPhase("idle");
+    if (lines.length > 0) setHasTalked(true);
   }
 
   return (
@@ -143,6 +163,19 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
           </div>
           {realCallEnabled && <p className="text-xs text-slate-400">Talk to a live AI voice right in your browser — it uses your mic, no phone needed.</p>}
           {error && <p className="text-xs text-red-500">{error}</p>}
+
+          {/* After they've heard it: they already started building — keep it. */}
+          {hasTalked && phase === "idle" && (
+            <div className="rounded-xl border border-accent-200 bg-accent-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">That could be your phone getting answered.</p>
+              <p className="mt-1 text-sm text-slate-600">
+                Sign up and we&apos;ll carry over what you typed here — your setup starts where the demo left off.
+              </p>
+              <Link href="/login" className="btn-accent mt-3">
+                Keep this receptionist
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { CARRIERS } from "@/lib/carriers";
+import { WebCallButton } from "@/components/web-call-button";
 import {
   approveTestAgent,
   reportTestProblem,
@@ -11,74 +12,7 @@ import {
   simulateForwarded,
   submitA2PInfo,
   skipTexting,
-  startWebCall,
 } from "./actions";
-
-// In-browser voice call to the receptionist — no phone number required.
-function WebCallButton() {
-  const [state, setState] = useState<"idle" | "connecting" | "live" | "error">("idle");
-  const [error, setError] = useState("");
-  const clientRef = useRef<{ stopCall: () => void } | null>(null);
-
-  async function start() {
-    setError("");
-    setState("connecting");
-    try {
-      const res = await startWebCall();
-      if ("error" in res) {
-        setState("error");
-        setError(res.error);
-        return;
-      }
-      const { RetellWebClient } = await import("retell-client-js-sdk");
-      const client = new RetellWebClient();
-      clientRef.current = client;
-      client.on("call_started", () => setState("live"));
-      client.on("call_ended", () => {
-        setState("idle");
-        clientRef.current = null;
-      });
-      client.on("error", (e: unknown) => {
-        setError(String((e as { message?: string })?.message ?? e));
-        setState("error");
-        try {
-          client.stopCall();
-        } catch {}
-      });
-      await client.startCall({ accessToken: res.accessToken });
-    } catch (e) {
-      setState("error");
-      setError((e as Error).message || "Could not start the call. Check microphone permission.");
-    }
-  }
-
-  function stop() {
-    clientRef.current?.stopCall();
-    setState("idle");
-  }
-
-  return (
-    <div className="rounded-xl bg-slate-900 p-5 text-white">
-      <p className="text-sm font-medium">Talk to your receptionist right here</p>
-      <p className="mt-1 text-xs text-slate-300">No phone needed — we&apos;ll use your computer&apos;s mic and speaker.</p>
-      {state === "live" ? (
-        <button onClick={stop} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold hover:bg-red-600">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> End call
-        </button>
-      ) : (
-        <button
-          onClick={start}
-          disabled={state === "connecting"}
-          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:opacity-60"
-        >
-          🎙️ {state === "connecting" ? "Connecting…" : "Start web call"}
-        </button>
-      )}
-      {state === "live" && <p className="mt-2 text-xs text-green-300">Connected — say &quot;I&apos;d like to book an oil change.&quot;</p>}
-      {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
-    </div>
-  );
-}
 import type { A2PBusinessInfo } from "@/lib/integrations/twilio";
 
 function CopyNumber({ number }: { number: string }) {

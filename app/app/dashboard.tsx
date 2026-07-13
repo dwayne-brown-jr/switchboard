@@ -72,7 +72,7 @@ export function Dashboard({ shop, data, calls, period }: { shop: Shop; data: Das
         <Kpi icon={icons.phone} label="Calls answered" value={s.callsAnswered} delta={data.deltas.callsAnswered} sub={`${s.afterHours} after hours`} />
         <Kpi icon={icons.calendar} label="Jobs booked" value={s.jobsBooked} delta={data.deltas.jobsBooked} sub={`${s.messages} messages taken`} />
         <Kpi icon={icons.dollar} label="Revenue booked" value={formatMoney(s.revenueBooked)} delta={data.deltas.revenueBooked} sub="estimated" accent />
-        <Kpi icon={icons.moon} label="After-hours captured" value={s.afterHours} delta={data.deltas.afterHours} sub={`${s.hotJobs} emergencies flagged`} />
+        <Kpi icon={icons.moon} label="Saved from voicemail" value={s.afterHours} delta={data.deltas.afterHours} sub={`after-hours · ${s.hotJobs} emergencies flagged`} />
       </div>
 
       {/* Analytics */}

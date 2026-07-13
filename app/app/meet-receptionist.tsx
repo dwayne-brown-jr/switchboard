@@ -85,7 +85,7 @@ function QaResultBlock({ verdict, flags }: { verdict: string | null; flags: QaFl
         <span className="text-lg">✅</span>
         <div>
           <p className="font-semibold text-green-800">Ready to go</p>
-          <p className="text-sm text-green-700">Your receptionist passed our quality check. The next step is to start your subscription.</p>
+          <p className="text-sm text-green-700">Your receptionist passed our quality check. Next: give it a real call, then pick a plan to turn it on.</p>
           {flags.length > 0 && (
             <ul className="mt-2 space-y-1 text-sm text-green-700">
               {flags.map((f, i) => (

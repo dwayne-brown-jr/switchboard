@@ -46,8 +46,8 @@ export default async function SubscribePage() {
         </h1>
         <p className="mx-auto mt-2 max-w-lg text-slate-600">
           It&apos;s built, quality-checked, and ready to answer. Until it&apos;s live, every call you can&apos;t get
-          to still goes to voicemail — pick a plan and we&apos;ll set up the phone number and calendar automatically.
-          Cancel anytime.
+          to still goes to voicemail — start your subscription and we&apos;ll set up the phone number and calendar
+          automatically. Cancel anytime.
         </p>
       </div>
 
@@ -86,7 +86,7 @@ export default async function SubscribePage() {
       {/* Anchor the price against the value of one job, not against $0. */}
       <p className="mx-auto mt-6 max-w-lg text-center text-sm text-slate-500">
         For reference: the average {vertical.label.toLowerCase()} job is about ${vertical.avgTicket.toLocaleString()}.
-        If your receptionist saves one missed call a month, any plan pays for itself.
+        If your receptionist saves one missed call a month, it pays for itself.
       </p>
     </div>
   );

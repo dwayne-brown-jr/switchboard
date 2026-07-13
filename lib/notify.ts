@@ -88,6 +88,30 @@ export async function notifyOwnerBilling(email: string, businessName: string, ki
   }
 }
 
+/** Gentle nudge to an owner who started onboarding and stalled at a pre-live
+ *  step. Step-aware so the ask is concrete (pay / forward / finish). */
+export async function notifyOwnerOnboardingNudge(email: string, businessName: string, step: string) {
+  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const asks: Record<string, { subject: string; line: string; cta: string; href: string }> = {
+    wizard: { subject: `Finish building ${businessName}'s receptionist`, line: "You started setting up your receptionist but didn't finish. It only takes a few more minutes to get it answering your calls.", cta: "Finish setup", href: "/app/setup" },
+    subscribe: { subject: `${businessName}'s receptionist is built — turn it on`, line: "Your receptionist is built and quality-checked. Start your subscription and we'll set up the phone number automatically so it can start answering.", cta: "Go live", href: "/app/subscribe" },
+    test_agent: { subject: `One step left to go live — ${businessName}`, line: "You're almost there. Give your receptionist a quick test call, then forward your line to take it live.", cta: "Continue setup", href: "/app/go-live" },
+    forwarding: { subject: `You're paying — let's get ${businessName} answering`, line: "Your receptionist is ready and your number is set up. Forward your calls to it so it can start answering — that's the last step to go live.", cta: "Forward my calls", href: "/app/go-live" },
+  };
+  const a = asks[step] ?? asks.wizard;
+  await sendEmail({
+    to: email,
+    subject: a.subject,
+    text: `${a.line}\n\n${a.cta}: ${appUrl}${a.href}`,
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#0f172a">
+        <h1 style="font-size:20px;margin:0 0 8px">${escapeHtml(a.subject)}</h1>
+        <p style="color:#475569;font-size:15px;line-height:1.5">${escapeHtml(a.line)}</p>
+        <p style="margin-top:20px"><a href="${appUrl}${a.href}" style="background:#2449d6;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;display:inline-block">${escapeHtml(a.cta)}</a></p>
+      </div>`,
+  });
+}
+
 export async function notifyAdminStepFailed(args: { runId: string; key: string; message: string }) {
   await notifyAdmins(
     `Step failed: ${args.key}`,

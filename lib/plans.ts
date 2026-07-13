@@ -11,41 +11,24 @@ export interface Plan {
   popular?: boolean;
 }
 
+// One plan for launch. The product gives every shop the full receptionist, so
+// we sell exactly that — one honest, flat price. (Tiering can come later once
+// there are real customers and a clear feature to gate.) The Stripe price used
+// is STRIPE_PRICE_FRONT_DESK; change `price` here + that env together to reprice.
 export const PLANS: Plan[] = [
   {
-    id: "catch",
-    name: "Catch",
-    price: 49,
-    tagline: "Never miss a call again",
-    features: [
-      "Answers every call, 24/7",
-      "Takes messages & texts you",
-      "Flags emergencies instantly",
-    ],
-  },
-  {
     id: "front_desk",
-    name: "Front Desk",
+    name: "Switchboard",
     price: 149,
-    tagline: "Books jobs while you work",
+    tagline: "Your AI receptionist, always on",
     popular: true,
     features: [
-      "Everything in Catch",
+      "Answers every call, 24/7",
       "Books appointments on your calendar",
-      "Answers your common questions",
-      "Missed-call text-back",
-    ],
-  },
-  {
-    id: "growth",
-    name: "Growth",
-    price: 299,
-    tagline: "Your busiest front desk",
-    features: [
-      "Everything in Front Desk",
-      "Priority support",
-      "Weekly performance reports",
-      "Higher call volume",
+      "Answers your customers' common questions",
+      "Flags emergencies & texts you instantly",
+      "Hands off to you when a call needs a human",
+      "Cancel anytime",
     ],
   },
 ];

@@ -87,8 +87,9 @@ export async function publishVersion(shopId: string, versionId: string, actorId?
     // (best-effort — a stale transfer number shouldn't block a settings publish).
     await provider.updateTransferNumber?.(shop.agentId, shop.ownerMobile).catch(() => {});
   }
-  // Sync calendar availability if hours changed (best-effort).
-  await updateAvailability(shopId, config).catch(() => {});
+  // Sync the shop's hours into its Cal.com schedule so edited hours actually
+  // change what the agent offers (best-effort).
+  await updateAvailability(shopId, config, Object.values((shop.calEventTypeMap as Record<string, string> | null) ?? {}), shop.timezone).catch(() => {});
 
   await prisma.agentVersion.updateMany({ where: { shopId, status: "live" }, data: { status: "archived" } });
   await prisma.agentVersion.update({ where: { id: version.id }, data: { status: "live" } });

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "../db";
 import { isPaying } from "../stripe";
 import { defaultVoiceProvider } from "../integrations/voice";
-import { createEventTypes } from "../integrations/calcom";
+import { createEventTypes, updateAvailability } from "../integrations/calcom";
 import { searchAndBuyNumber, attachNumberToTrunk } from "../integrations/twilio";
 import { importPhoneNumber } from "../integrations/retell";
 import { agentFunctions, agentWebhookUrl, agentBaseUrl } from "../integrations/agentTools";
@@ -78,6 +78,10 @@ export const provisionCalendarHandler: AutoHandler = async ({ shop }) => {
 
   const map = await createEventTypes(shop.id, config);
   await prisma.shop.update({ where: { id: shop.id }, data: { calEventTypeMap: map } });
+  // Sync the shop's real hours into a dedicated Cal.com schedule so the agent
+  // only offers times the shop is actually open (best-effort — don't fail
+  // provisioning if it hiccups; publish re-syncs it).
+  await updateAvailability(shop.id, config, Object.values(map), shop.timezone).catch((e) => console.error("availability sync failed", e));
   return done({ eventTypes: Object.keys(map).length });
 };
 

@@ -59,11 +59,65 @@ export async function createEventTypes(
   return map;
 }
 
-/** Update availability windows post-live (hours changes sync here in Phase 3). */
-export async function updateAvailability(_shopId: string, _config: ShopConfig): Promise<void> {
+const DAY_NAME: Record<string, string> = {
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+  sun: "Sunday",
+};
+
+// Schedules use a different cal-api-version than event-types.
+async function calApi<T>(path: string, method: string, body: unknown, version: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${process.env.CALCOM_API_KEY}`, "Content-Type": "application/json", "cal-api-version": version },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`Cal.com ${method} ${path} failed (${res.status}): ${await res.text().catch(() => "")}`);
+  return (await res.json()) as T;
+}
+
+/**
+ * Sync the shop's real business hours into a DEDICATED Cal.com schedule and
+ * attach the shop's event types to it — so the agent only ever offers times the
+ * shop is actually open (and stops hiding hours the generic default omits).
+ * Idempotent: the schedule is keyed by name `sb-{shopId}`.
+ */
+export async function updateAvailability(
+  shopId: string,
+  config: ShopConfig,
+  eventTypeIds: string[],
+  timezone: string | null,
+): Promise<void> {
   if (!hasKey()) return;
-  // Availability schedules are attached to the user; a full implementation maps
-  // config.hours → a Cal.com schedule. Left as a Phase-3 wiring point.
+
+  const availability = Object.entries(config.hours)
+    .filter(([, h]) => !h.closed && h.open && h.close)
+    .map(([day, h]) => ({ days: [DAY_NAME[day]], startTime: h.open, endTime: h.close }));
+  if (availability.length === 0) return; // no open days configured — leave as-is
+
+  const tz = timezone || "America/Chicago";
+  const name = `sb-${shopId}`;
+
+  // Find-or-create the shop's schedule (name is our idempotency key).
+  const list = await calApi<{ data: { id: number; name: string }[] }>("/schedules", "GET", undefined, "2024-06-11");
+  const existing = (list.data ?? []).find((s) => s.name === name);
+  let scheduleId: number;
+  if (existing) {
+    scheduleId = existing.id;
+    await calApi(`/schedules/${scheduleId}`, "PATCH", { timeZone: tz, availability }, "2024-06-11");
+  } else {
+    const created = await calApi<{ data: { id: number } }>("/schedules", "POST", { name, timeZone: tz, isDefault: false, availability }, "2024-06-11");
+    scheduleId = created.data.id;
+  }
+
+  // Point every one of the shop's event types at this schedule.
+  for (const id of eventTypeIds) {
+    await calApi(`/event-types/${id}`, "PATCH", { scheduleId }, "2024-06-14").catch((e) => console.error(`attach schedule to event-type ${id} failed`, e));
+  }
 }
 
 // --- Call-time booking (used by the native agent tool routes) ---------------

@@ -1,5 +1,6 @@
 import "server-only";
 import type { VoiceProvider, CreateAgentArgs } from "./voice";
+import { toE164 } from "../phone";
 
 // Retell integration (primary voice provider). Real REST calls when
 // RETELL_API_KEY is set. NOTE: voice IDs and exact field names should be
@@ -62,14 +63,15 @@ function toRetellTools(args: CreateAgentArgs): Record<string, unknown>[] {
   }));
   // Live human handoff — connect the caller to a person when the agent can't
   // help. Cold transfer to the owner's number (must NOT be the forwarded
-  // business line, or it would loop back to the agent).
-  if (args.transferNumber) {
+  // business line, or it would loop back to the agent). Retell needs E.164.
+  const transferNum = toE164(args.transferNumber);
+  if (transferNum) {
     tools.push({
       type: "transfer_call",
       name: "transfer_to_human",
       description:
         "Connect the caller to a live person at the business. Use ONLY when the caller needs something you genuinely cannot do, or explicitly asks for a person — and only after collecting their name, callback number, and reason.",
-      transfer_destination: { type: "predefined", number: args.transferNumber },
+      transfer_destination: { type: "predefined", number: transferNum },
       transfer_option: { type: "cold_transfer" },
     });
   }
@@ -196,6 +198,28 @@ export function createRetellProvider(): VoiceProvider {
 
     async deleteAgent(agentId) {
       await api(`/delete-agent/${agentId}`, "DELETE").catch(() => {});
+    },
+
+    // Upsert the transfer_to_human tool on the live agent, preserving the other
+    // tools. Called when an owner changes their handoff number in settings.
+    async updateTransferNumber(agentId, number) {
+      const e164 = toE164(number);
+      const agent = await api<{ response_engine?: { llm_id?: string }; metadata?: { llm_id?: string } }>(`/get-agent/${agentId}`, "GET");
+      const llmId = agent.response_engine?.llm_id ?? agent.metadata?.llm_id;
+      if (!llmId) return;
+      const llm = await api<{ general_tools?: { name?: string }[] }>(`/get-retell-llm/${llmId}`, "GET");
+      const tools = (llm.general_tools ?? []).filter((t) => t.name !== "transfer_to_human");
+      if (e164) {
+        tools.push({
+          type: "transfer_call",
+          name: "transfer_to_human",
+          description:
+            "Connect the caller to a live person at the business. Use ONLY when the caller needs something you genuinely cannot do, or explicitly asks for a person — and only after collecting their name, callback number, and reason.",
+          transfer_destination: { type: "predefined", number: e164 },
+          transfer_option: { type: "cold_transfer" },
+        } as never);
+      }
+      await api(`/update-retell-llm/${llmId}`, "PATCH", { general_tools: tools });
     },
   };
 }

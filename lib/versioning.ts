@@ -45,6 +45,11 @@ export async function createDraft(shopId: string, wizardInput: unknown, actorId?
   const systemPrompt = await generatePrompt(config);
   const qa = await qaReview(systemPrompt, config);
 
+  // Owner mobile is a contact detail (alerts + live-handoff target), not agent
+  // behavior — persist it to the shop immediately so it's current even before
+  // publish. The live agent's transfer number is synced at publish time.
+  await prisma.shop.update({ where: { id: shopId }, data: { ownerMobile: wizard.ownerMobile?.trim() || null } });
+
   // Replace any existing un-published draft so history stays clean.
   await prisma.agentVersion.deleteMany({ where: { shopId, status: "draft" } });
   const version = await prisma.agentVersion.create({
@@ -72,11 +77,15 @@ export async function publishVersion(shopId: string, versionId: string, actorId?
 
   // Update the live agent (voice + prompt) via the provider.
   if (shop.agentId && shop.agentProvider) {
-    await getVoiceProvider(shop.agentProvider)
+    const provider = getVoiceProvider(shop.agentProvider);
+    await provider
       .updateAgent(shop.agentId, { systemPrompt: version.systemPrompt, voice: config.voice, greeting: config.greeting ?? "" })
       .catch((e) => {
         throw new Error(`Couldn't update your live receptionist: ${(e as Error).message}`);
       });
+    // Sync the live human-handoff transfer number to the owner's current mobile
+    // (best-effort — a stale transfer number shouldn't block a settings publish).
+    await provider.updateTransferNumber?.(shop.agentId, shop.ownerMobile).catch(() => {});
   }
   // Sync calendar availability if hours changed (best-effort).
   await updateAvailability(shopId, config).catch(() => {});

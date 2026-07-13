@@ -47,6 +47,7 @@ export function SettingsEditor({ initial }: { initial: WizardData }) {
       <HoursSection data={data} update={update} />
       <FaqsSection data={data} update={update} />
       <EmergenciesSection data={data} update={update} />
+      <ContactSection data={data} update={update} />
       <VoiceSection data={data} update={update} />
 
       {/* Sticky action bar */}
@@ -212,6 +213,18 @@ function EmergenciesSection({ data, update }: P) {
         <label className="label mb-1.5 block">Alert number</label>
         <input className="input" value={data.emergencies.alertNumber} onChange={(e) => update({ emergencies: { ...data.emergencies, alertNumber: e.target.value } })} />
       </div>
+    </Section>
+  );
+}
+
+function ContactSection({ data, update }: P) {
+  return (
+    <Section title="Your phone" desc="Where the receptionist reaches you — and where it rings you when it hands off a live call it can't handle.">
+      <label className="label mb-1.5 block">Your mobile number</label>
+      <input className="input" value={data.ownerMobile} onChange={(e) => update({ ownerMobile: e.target.value })} placeholder="(555) 123-4567" />
+      <p className="mt-1.5 text-xs text-slate-400">
+        When the receptionist can&apos;t help a caller, it connects them to this number. Use a line you actually answer — and <strong>not</strong> the business line your calls forward from (that would loop back to the receptionist).
+      </p>
     </Section>
   );
 }

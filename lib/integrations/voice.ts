@@ -35,6 +35,8 @@ export interface VoiceProvider {
   pauseAgent(agentId: string): Promise<void>;
   resumeAgent(agentId: string): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
+  /** Update (or remove, when null) the live human-handoff transfer number. */
+  updateTransferNumber?(agentId: string, number: string | null): Promise<void>;
 }
 
 /** The provider to use for NEW provisioning: Retell if keyed, else mock. */

@@ -50,6 +50,21 @@ After deploying to a public URL, create the recurring jobs in the Upstash QStash
 console (Schedules → Create) pointing at your deployed app:
 
 - **Weekly digest** — cron `0 14 * * 1` (Mondays 2pm UTC) → `POST {APP_URL}/api/jobs/weekly-digest`
+- **Onboarding sweep** — cron `*/30 * * * *` (every 30 min) → `POST {APP_URL}/api/jobs/onboarding-sweep`
+  Self-heals signups whose progress signal was lost (missed Stripe webhook, crashed
+  auto pass): reconciles subscribe-stalled runs against Stripe, resumes in_progress
+  runs, and pages admins about runs stuck > `ONBOARDING_STUCK_HOURS` (default 72).
+- **Reclaim numbers** — cron `0 3 * * *` (daily 3am UTC) → `POST {APP_URL}/api/jobs/reclaim-numbers`
+  Permanently releases the Twilio number of any shop that has stayed canceled
+  longer than `CANCEL_GRACE_DAYS` (default 30), so churned shops stop costing the
+  monthly number fee. Resubscribing within the window keeps the number.
+- **Health check** — cron `0 15 * * *` (daily 3pm UTC) → `POST {APP_URL}/api/jobs/health-check`
+  Pages admins when a live shop that was receiving calls goes silent for
+  `SILENT_SHOP_DAYS` (default 4) — the tell-tale sign of a broken voice path.
+- **Reminders** — cron `0 16 * * *` (daily 4pm UTC) → `POST {APP_URL}/api/jobs/reminders`
+  Emails owners: escalating past-due dunning (day 3 + day 7; day 1 fires live) and
+  a one-time nudge to anyone stalled mid-onboarding past `ONBOARDING_NUDGE_DAYS`
+  (default 2). Never pauses service — cancellation is the only hard stop.
 
 The A2P-poll and forwarding-timeout jobs are scheduled automatically by the app
 when those steps run; they only fire once the app is reachable at a public URL

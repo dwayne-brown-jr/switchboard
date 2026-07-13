@@ -2,7 +2,8 @@ import type Stripe from "stripe";
 import { prisma } from "./db";
 import { completeUserStep } from "./engine";
 import { isPaying } from "./stripe";
-import { pauseShopAgent } from "./lifecycle";
+import { cancelShop, resumeShopAgent } from "./lifecycle";
+import { reportError } from "./observability";
 import { logAudit } from "./audit";
 import { notifyOwnerBilling } from "./notify";
 
@@ -39,6 +40,23 @@ export async function syncSubscription(sub: Stripe.Subscription, planHint?: stri
     }
   }
 
+  // Resubscribed after a cancellation (shop.status is the pre-update value).
+  if (isPaying(sub.status) && shop.status === "canceled") {
+    if (shop.twilioNumberSid) {
+      // Number still held (within grace) → bring the agent back.
+      await logAudit(shop.id, null, "subscription.reactivated", {});
+      await resumeShopAgent(shop.id);
+    } else {
+      // Number already reclaimed past grace — needs re-provisioning by an admin.
+      await reportError(new Error(`Shop ${shop.id} resubscribed after its number was reclaimed — needs re-provisioning`), {
+        source: "webhook",
+        route: "billing:resubscribe",
+        shopId: shop.id,
+        level: "warn",
+      });
+    }
+  }
+
   // Payment problem (dunning) → tell the owner to fix their card. We do NOT pause
   // yet — Stripe's retries + past_due window are the grace period. Only a full
   // cancellation stops the service.
@@ -47,11 +65,12 @@ export async function syncSubscription(sub: Stripe.Subscription, planHint?: stri
     if (shop.owner?.email) await notifyOwnerBilling(shop.owner.email, shop.businessName, "past_due");
   }
 
-  // Canceled → actually stop answering (pauseShopAgent now unbinds the number)
-  // and notify the owner.
+  // Canceled → stop answering (cancelShop unbinds the number + marks the shop
+  // "canceled"), notify the owner, and let the grace-window reclaim cron release
+  // the number later if they don't resubscribe.
   if (sub.status === "canceled") {
     await logAudit(shop.id, null, "subscription.canceled", {});
-    await pauseShopAgent(shop.id, "subscription canceled");
+    await cancelShop(shop.id, "subscription canceled");
     if (shop.owner?.email) await notifyOwnerBilling(shop.owner.email, shop.businessName, "canceled");
   }
 }

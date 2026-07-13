@@ -68,6 +68,16 @@ export interface CallRow {
   estJobValue: number;
   hotJob: boolean;
   durationSec: number;
+  recordingUrl: string | null;
+}
+export interface Appointment {
+  id: string;
+  startUtc: string;
+  endUtc: string;
+  service: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  source: string;
 }
 
 // --- Endpoints -------------------------------------------------------------
@@ -84,6 +94,7 @@ export const api = {
 
   home: () => request<HomeResponse>("/api/mobile/home"),
   calls: () => request<{ calls: CallRow[] }>("/api/mobile/calls"),
+  appointments: () => request<{ appointments: Appointment[] }>("/api/mobile/appointments"),
   setPaused: (paused: boolean) =>
     request<{ status: string; paused: boolean }>("/api/mobile/pause", {
       method: "POST",

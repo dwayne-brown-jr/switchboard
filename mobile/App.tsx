@@ -13,12 +13,15 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Modal } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { api, clearToken, getToken, setToken, type CallRow, type HomeResponse } from "./src/api";
+import { Audio } from "expo-av";
+import { api, clearToken, getToken, setToken, type Appointment, type CallRow, type HomeResponse } from "./src/api";
 import { registerForPush } from "./src/push";
 import { COLORS } from "./src/config";
 
-type Screen = "loading" | "login" | "home" | "calls";
+type Screen = "loading" | "login" | "home" | "calls" | "appointments";
+type Tab = "home" | "calls" | "appointments";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
@@ -158,10 +161,13 @@ function MainScreen({
   return (
     <SafeAreaView style={styles.fill}>
       <StatusBar style="dark" />
-      {screen === "home" ? <HomeTab onSignOut={onSignOut} /> : <CallsTab />}
+      {screen === "home" && <HomeTab onSignOut={onSignOut} />}
+      {screen === "calls" && <CallsTab />}
+      {screen === "appointments" && <AppointmentsTab />}
       <View style={styles.tabBar}>
         <TabButton label="Home" active={screen === "home"} onPress={() => setScreen("home")} />
         <TabButton label="Calls" active={screen === "calls"} onPress={() => setScreen("calls")} />
+        <TabButton label="Appointments" active={screen === "appointments"} onPress={() => setScreen("appointments")} />
       </View>
     </SafeAreaView>
   );
@@ -264,6 +270,7 @@ function CallsTab() {
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selected, setSelected] = useState<CallRow | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -286,12 +293,170 @@ function CallsTab() {
   }
 
   return (
+    <>
+      <FlatList
+        contentContainerStyle={styles.body}
+        data={calls}
+        keyExtractor={(c) => c.id}
+        ListHeaderComponent={<Text style={styles.h2}>Recent calls</Text>}
+        ListEmptyComponent={<Text style={[styles.muted, { marginTop: 24 }]}>No calls yet.</Text>}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load().finally(() => setRefreshing(false));
+            }}
+          />
+        }
+        renderItem={({ item }) => <CallItem call={item} onPress={() => setSelected(item)} />}
+      />
+      <CallDetailModal call={selected} onClose={() => setSelected(null)} />
+    </>
+  );
+}
+
+function CallItem({ call, onPress }: { call: CallRow; onPress: () => void }) {
+  const when = new Date(call.timestamp);
+  const outcome = call.hotJob ? "Emergency" : call.booked ? "Booked" : call.outcome === "message" ? "Message" : "Call";
+  const tone = call.hotJob ? "red" : call.booked ? "green" : "muted";
+  return (
+    <Pressable style={styles.callRow} onPress={onPress}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.callTitle}>{call.callerPhone ?? "Unknown caller"}</Text>
+        <Text style={styles.muted} numberOfLines={1}>
+          {call.service ?? call.intent ?? "—"}
+          {call.recordingUrl ? "  🎧" : ""}
+        </Text>
+      </View>
+      <View style={{ alignItems: "flex-end" }}>
+        <Badge tone={tone as any}>{outcome}</Badge>
+        <Text style={[styles.muted, { fontSize: 12, marginTop: 4 }]}>
+          {when.toLocaleDateString([], { month: "short", day: "numeric" })}{" "}
+          {when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function CallDetailModal({ call, onClose }: { call: CallRow | null; onClose: () => void }) {
+  return (
+    <Modal visible={!!call} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <SafeAreaView style={styles.fill}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.h2}>Call details</Text>
+          <Pressable onPress={onClose}>
+            <Text style={[styles.muted, { fontSize: 16 }]}>Done</Text>
+          </Pressable>
+        </View>
+        {call && (
+          <ScrollView contentContainerStyle={styles.body}>
+            <DetailRow label="Caller" value={call.callerPhone ?? "Unknown"} />
+            <DetailRow label="When" value={new Date(call.timestamp).toLocaleString()} />
+            <DetailRow label="Outcome" value={call.hotJob ? "Emergency" : call.booked ? "Booked" : call.outcome ?? "—"} />
+            {!!call.service && <DetailRow label="Service" value={call.service} />}
+            {!!call.apptTime && <DetailRow label="Appointment" value={call.apptTime} />}
+            {call.booked && <DetailRow label="Est. value" value={`$${call.estJobValue.toLocaleString()}`} />}
+            <DetailRow label="Duration" value={`${Math.floor(call.durationSec / 60)}m ${call.durationSec % 60}s`} />
+            {call.recordingUrl ? (
+              <RecordingPlayer url={call.recordingUrl} />
+            ) : (
+              <Text style={[styles.muted, { marginTop: 16 }]}>No recording available for this call.</Text>
+            )}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.muted}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
+function RecordingPlayer({ url }: { url: string }) {
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Unload the sound when the player unmounts (modal closed).
+  useEffect(() => {
+    return () => {
+      sound?.unloadAsync().catch(() => {});
+    };
+  }, [sound]);
+
+  async function toggle() {
+    try {
+      if (!sound) {
+        setLoading(true);
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+        const created = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
+        created.sound.setOnPlaybackStatusUpdate((s) => {
+          if ("didJustFinish" in s && s.didJustFinish) setPlaying(false);
+        });
+        setSound(created.sound);
+        setPlaying(true);
+        setLoading(false);
+        return;
+      }
+      if (playing) {
+        await sound.pauseAsync();
+        setPlaying(false);
+      } else {
+        await sound.playAsync();
+        setPlaying(true);
+      }
+    } catch {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Pressable style={[styles.btn, { marginTop: 20 }]} onPress={toggle} disabled={loading}>
+      <Text style={styles.btnText}>{loading ? "Loading…" : playing ? "⏸  Pause recording" : "▶  Play recording"}</Text>
+    </Pressable>
+  );
+}
+
+function AppointmentsTab() {
+  const [appts, setAppts] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setAppts((await api.appointments()).appointments);
+    } catch {
+      /* keep prior */
+    }
+  }, []);
+
+  useEffect(() => {
+    load().finally(() => setLoading(false));
+  }, [load]);
+
+  if (loading) {
+    return (
+      <View style={[styles.fill, styles.center]}>
+        <ActivityIndicator color={COLORS.brand} />
+      </View>
+    );
+  }
+
+  return (
     <FlatList
       contentContainerStyle={styles.body}
-      data={calls}
-      keyExtractor={(c) => c.id}
-      ListHeaderComponent={<Text style={styles.h2}>Recent calls</Text>}
-      ListEmptyComponent={<Text style={[styles.muted, { marginTop: 24 }]}>No calls yet.</Text>}
+      data={appts}
+      keyExtractor={(a) => a.id}
+      ListHeaderComponent={<Text style={styles.h2}>Upcoming appointments</Text>}
+      ListEmptyComponent={<Text style={[styles.muted, { marginTop: 24 }]}>No upcoming appointments.</Text>}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -301,29 +466,26 @@ function CallsTab() {
           }}
         />
       }
-      renderItem={({ item }) => <CallItem call={item} />}
+      renderItem={({ item }) => <AppointmentItem appt={item} />}
     />
   );
 }
 
-function CallItem({ call }: { call: CallRow }) {
-  const when = new Date(call.timestamp);
-  const outcome = call.hotJob ? "Emergency" : call.booked ? "Booked" : call.outcome === "message" ? "Message" : "Call";
-  const tone = call.hotJob ? "red" : call.booked ? "green" : "muted";
+function AppointmentItem({ appt }: { appt: Appointment }) {
+  const start = new Date(appt.startUtc);
   return (
     <View style={styles.callRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.callTitle}>{call.callerPhone ?? "Unknown caller"}</Text>
-        <Text style={styles.muted} numberOfLines={1}>
-          {call.service ?? call.intent ?? "—"}
-        </Text>
+      <View style={styles.apptDate}>
+        <Text style={styles.apptMonth}>{start.toLocaleDateString([], { month: "short" }).toUpperCase()}</Text>
+        <Text style={styles.apptDay}>{start.getDate()}</Text>
       </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Badge tone={tone as any}>{outcome}</Badge>
-        <Text style={[styles.muted, { fontSize: 12, marginTop: 4 }]}>
-          {when.toLocaleDateString([], { month: "short", day: "numeric" })}{" "}
-          {when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.callTitle}>{appt.service ?? "Appointment"}</Text>
+        <Text style={styles.muted}>
+          {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          {appt.customerName ? `  ·  ${appt.customerName}` : ""}
         </Text>
+        {!!appt.customerPhone && <Text style={[styles.muted, { fontSize: 12 }]}>{appt.customerPhone}</Text>}
       </View>
     </View>
   );
@@ -406,6 +568,14 @@ const styles = StyleSheet.create({
 
   tabBar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: COLORS.card },
   tabBtn: { flex: 1, alignItems: "center", paddingVertical: 14 },
-  tabText: { color: COLORS.muted, fontWeight: "600", fontSize: 15 },
+  tabText: { color: COLORS.muted, fontWeight: "600", fontSize: 14 },
   tabTextActive: { color: COLORS.brand },
+
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 20, paddingBottom: 4 },
+  detailRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: COLORS.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: COLORS.border },
+  detailValue: { color: COLORS.text, fontWeight: "600", fontSize: 15, flexShrink: 1, textAlign: "right", marginLeft: 12 },
+
+  apptDate: { width: 52, height: 52, borderRadius: 12, backgroundColor: COLORS.bg, alignItems: "center", justifyContent: "center" },
+  apptMonth: { color: COLORS.brand, fontWeight: "700", fontSize: 11 },
+  apptDay: { color: COLORS.text, fontWeight: "800", fontSize: 20, lineHeight: 22 },
 });

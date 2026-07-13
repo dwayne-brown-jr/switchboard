@@ -23,6 +23,7 @@ export async function GET(req: Request) {
       estJobValue: c.estJobValue,
       hotJob: c.hotJob,
       durationSec: c.durationSec,
+      recordingUrl: c.transcriptUrl, // Retell recording_url is stored here
     })),
   });
 }

@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { Modal } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Audio } from "expo-av";
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from "expo-audio";
 import { api, clearToken, getToken, setToken, type Appointment, type CallRow, type HomeResponse } from "./src/api";
 import { registerForPush } from "./src/push";
 import { COLORS } from "./src/config";
@@ -381,46 +381,32 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 function RecordingPlayer({ url }: { url: string }) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const player = useAudioPlayer({ uri: url });
+  const status = useAudioPlayerStatus(player);
 
-  // Unload the sound when the player unmounts (modal closed).
+  // Allow playback even when the phone's ringer switch is silenced (iOS).
   useEffect(() => {
-    return () => {
-      sound?.unloadAsync().catch(() => {});
-    };
-  }, [sound]);
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+  }, []);
 
-  async function toggle() {
-    try {
-      if (!sound) {
-        setLoading(true);
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-        const created = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
-        created.sound.setOnPlaybackStatusUpdate((s) => {
-          if ("didJustFinish" in s && s.didJustFinish) setPlaying(false);
-        });
-        setSound(created.sound);
-        setPlaying(true);
-        setLoading(false);
-        return;
+  const playing = status.playing;
+  const ready = status.isLoaded;
+
+  function toggle() {
+    if (playing) {
+      player.pause();
+    } else {
+      // If it finished, start over from the top.
+      if (status.didJustFinish || (status.duration > 0 && status.currentTime >= status.duration)) {
+        player.seekTo(0);
       }
-      if (playing) {
-        await sound.pauseAsync();
-        setPlaying(false);
-      } else {
-        await sound.playAsync();
-        setPlaying(true);
-      }
-    } catch {
-      setLoading(false);
+      player.play();
     }
   }
 
   return (
-    <Pressable style={[styles.btn, { marginTop: 20 }]} onPress={toggle} disabled={loading}>
-      <Text style={styles.btnText}>{loading ? "Loading…" : playing ? "⏸  Pause recording" : "▶  Play recording"}</Text>
+    <Pressable style={[styles.btn, { marginTop: 20 }]} onPress={toggle} disabled={!ready}>
+      <Text style={styles.btnText}>{!ready ? "Loading…" : playing ? "⏸  Pause recording" : "▶  Play recording"}</Text>
     </Pressable>
   );
 }

@@ -40,11 +40,33 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
     update: data,
   });
 
-  if (!existing && (p.hot_job || p.booked) && shop.owner?.email) {
+  // Real-time owner backstop — only on genuinely-new booked/urgent calls.
+  if (!existing && (p.hot_job || p.booked)) {
     const kind = p.hot_job ? "emergency" : "booked";
     const detail = p.booked && p.service ? `${p.service}${p.appt_time ? ` · ${p.appt_time}` : ""}` : (p.intent ?? "");
-    const { notifyOwnerRealtimeCall } = await import("./notify");
-    await notifyOwnerRealtimeCall(shop.owner.email, shop.businessName, kind, detail).catch((e) => console.error("realtime notify failed", e));
+
+    // Email — both booked and emergency.
+    if (shop.owner?.email) {
+      const { notifyOwnerRealtimeCall } = await import("./notify");
+      await notifyOwnerRealtimeCall(shop.owner.email, shop.businessName, kind, detail).catch((e) => console.error("realtime notify failed", e));
+    }
+
+    // SMS — on BOOKINGS only. Emergencies are already texted by the agent's
+    // notify_owner tool mid-call, so a second text here would just be a dup.
+    // Gated on A2P approval (compliance) + an owner mobile + the shop's number.
+    if (kind === "booked" && shop.a2pStatus === "approved" && shop.ownerMobile && shop.agentNumber) {
+      const { sendSms } = await import("./integrations/twilio");
+      const { toE164 } = await import("./phone");
+      const to = toE164(shop.ownerMobile);
+      if (to) {
+        const when = p.appt_time
+          ? ` for ${new Date(p.appt_time).toLocaleString("en-US", { timeZone: shop.timezone ?? "America/Chicago", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+          : "";
+        const svc = p.service ? ` (${p.service})` : "";
+        const body = `📅 New booking${svc}${when} — ${shop.businessName}. Details on your dashboard.`;
+        await sendSms(to, shop.agentNumber, body).catch((e) => console.error("booking SMS failed", e));
+      }
+    }
   }
 
   return record;

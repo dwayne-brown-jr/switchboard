@@ -1,0 +1,27 @@
+{
+  "name": "switchboard-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android"
+  },
+  "dependencies": {
+    "expo": "~52.0.0",
+    "expo-constants": "~17.0.3",
+    "expo-device": "~7.0.1",
+    "expo-notifications": "~0.29.11",
+    "expo-secure-store": "~14.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.3.12",
+    "babel-preset-expo": "~12.0.0",
+    "typescript": "^5.3.3"
+  }
+}

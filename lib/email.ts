@@ -28,6 +28,23 @@ function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Six-digit sign-in code for the owner mobile app. */
+export async function sendMobileCodeEmail(to: string, code: string) {
+  const spaced = code.split("").join(" ");
+  return sendEmail({
+    to,
+    subject: `${code} is your Switchboard app code`,
+    text: `Your Switchboard app sign-in code is ${code}. It expires in 10 minutes. If you didn't request it, you can ignore this email.`,
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
+        <h1 style="font-size:20px;margin:0 0 8px">Your app sign-in code</h1>
+        <p style="color:#475569;font-size:15px;line-height:1.5">Enter this code in the Switchboard app to sign in. It expires in 10 minutes.</p>
+        <p style="font-size:34px;font-weight:700;letter-spacing:8px;margin:20px 0;color:#0f172a">${spaced}</p>
+        <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+      </div>`,
+  });
+}
+
 export function magicLinkEmail(url: string) {
   return {
     subject: "Your Switchboard sign-in link",

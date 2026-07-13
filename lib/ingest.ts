@@ -51,6 +51,14 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
       await notifyOwnerRealtimeCall(shop.owner.email, shop.businessName, kind, detail).catch((e) => console.error("realtime notify failed", e));
     }
 
+    // Push to the owner's mobile app devices — both booked and emergency.
+    {
+      const { pushToOwner } = await import("./push");
+      const title = kind === "emergency" ? `🚨 Emergency — ${shop.businessName}` : `📅 New booking — ${shop.businessName}`;
+      const fallback = kind === "emergency" ? "Urgent call flagged" : "New job booked";
+      await pushToOwner(shop.ownerId, { title, body: detail || fallback, data: { kind, shopId: shop.id } }).catch((e) => console.error("owner push failed", e));
+    }
+
     // SMS — on BOOKINGS only. Emergencies are already texted by the agent's
     // notify_owner tool mid-call, so a second text here would just be a dup.
     // Gated on A2P approval (compliance) + an owner mobile + the shop's number.

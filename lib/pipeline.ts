@@ -21,8 +21,11 @@ export const PIPELINE: StepDef[] = [
   { key: "generate_config", type: "auto", title: "Build your receptionist", blurb: "We turn your answers into a working receptionist.", phase: 1 },
   { key: "generate_prompt", type: "auto", title: "Teach it how to talk", blurb: "We give it your services, hours, and safety rules.", phase: 1 },
   { key: "qa_review", type: "auto", title: "Quality check", blurb: "We double-check everything before it can go live.", phase: 1 },
-  { key: "subscribe", type: "user", title: "Start your subscription", blurb: "Pick a plan to activate your receptionist.", phase: 2 },
+  // Voice is provisioned BEFORE the paywall on purpose: the owner gets to talk
+  // to their own receptionist (in-browser web call) before picking a plan.
+  // Creating the agent is free; the paid pieces (number, calendar) stay gated.
   { key: "provision_voice", type: "auto", title: "Give it a voice", blurb: "We set up the voice that answers your calls.", phase: 2 },
+  { key: "subscribe", type: "user", title: "Start your subscription", blurb: "Pick a plan to activate your receptionist.", phase: 2 },
   { key: "provision_calendar", type: "auto", title: "Connect your calendar", blurb: "We set up your booking calendar.", phase: 2 },
   { key: "provision_number", type: "auto", title: "Get your phone number", blurb: "We get a local number for your receptionist.", phase: 2 },
   { key: "register_pipeline", type: "auto", title: "Wire it all together", blurb: "We connect the pieces behind the scenes.", phase: 2 },

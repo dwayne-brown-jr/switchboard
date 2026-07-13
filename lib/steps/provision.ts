@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import { prisma } from "../db";
 import { isPaying } from "../stripe";
 import { defaultVoiceProvider } from "../integrations/voice";
-import { createEventTypes, updateAvailability } from "../integrations/calcom";
 import { searchAndBuyNumber, attachNumberToTrunk } from "../integrations/twilio";
 import { importPhoneNumber } from "../integrations/retell";
 import { agentFunctions, agentWebhookUrl, agentBaseUrl } from "../integrations/agentTools";
@@ -34,10 +33,12 @@ function areaCodeFrom(phone: string | null): string | undefined {
   return local.length >= 10 ? local.slice(0, 3) : undefined;
 }
 
-// 7 — provision_voice
+// 6 — provision_voice
+// Deliberately NOT subscription-gated: this step runs before the paywall so the
+// owner can web-call their own receptionist before paying. Creating the agent
+// costs nothing; per-call spend is capped by the webcall rate limit, and the
+// paid resources (phone number, calendar) below remain gated.
 export const provisionVoiceHandler: AutoHandler = async ({ shop }) => {
-  const blocked = gate(shop.subStatus);
-  if (blocked) return failed(blocked);
   if (shop.agentId) return done({ agentId: shop.agentId, reused: true });
 
   const version = await approvedVersion(shop.id);
@@ -67,22 +68,17 @@ export const provisionVoiceHandler: AutoHandler = async ({ shop }) => {
 };
 
 // 8 — provision_calendar
+// Switchboard owns scheduling: availability is computed from the shop's live
+// config hours minus the shop's own bookings (lib/scheduling + lib/booking), so
+// there's no external calendar to provision. Kept as a pipeline step so the
+// onboarding flow/UX is unchanged; it just confirms an approved config exists.
 export const provisionCalendarHandler: AutoHandler = async ({ shop }) => {
   const blocked = gate(shop.subStatus);
   if (blocked) return failed(blocked);
-  if (shop.calEventTypeMap) return done({ reused: true });
 
   const version = await approvedVersion(shop.id);
   if (!version) return failed("No approved version for calendar setup.");
-  const config = version.config as unknown as ShopConfig;
-
-  const map = await createEventTypes(shop.id, config);
-  await prisma.shop.update({ where: { id: shop.id }, data: { calEventTypeMap: map } });
-  // Sync the shop's real hours into a dedicated Cal.com schedule so the agent
-  // only offers times the shop is actually open (best-effort — don't fail
-  // provisioning if it hiccups; publish re-syncs it).
-  await updateAvailability(shop.id, config, Object.values(map), shop.timezone).catch((e) => console.error("availability sync failed", e));
-  return done({ eventTypes: Object.keys(map).length });
+  return done({ scheduling: "owned" });
 };
 
 // 9 — provision_number

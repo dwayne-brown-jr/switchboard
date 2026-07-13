@@ -76,10 +76,13 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
       {/* Subscribe gate — prominent CTA when it's the current step. */}
       {!blockMessage && runStatus === "waiting_user" && current === "subscribe" && (
         <div className="rounded-xl border border-brand-200 bg-brand-50 p-5">
-          <p className="font-semibold text-brand-900">Your receptionist is ready — pick a plan to activate it</p>
-          <p className="mt-1 text-sm text-brand-800">We&apos;ll set up the voice, calendar, and phone number automatically once you subscribe.</p>
+          <p className="font-semibold text-brand-900">Your receptionist is built — hear it, then turn it on</p>
+          <p className="mt-1 text-sm text-brand-800">
+            Give it a real call right in your browser. Until it&apos;s live, every call you can&apos;t get to still goes
+            to voicemail — pick a plan and we&apos;ll set up the phone number and calendar automatically.
+          </p>
           <Link href="/app/subscribe" className="btn-primary mt-3">
-            Choose your plan
+            Hear it &amp; go live
           </Link>
         </div>
       )}
@@ -124,11 +127,16 @@ function Welcome() {
       <h1 className="mt-5 text-2xl font-bold text-slate-900">Let&apos;s build your receptionist</h1>
       <p className="mt-2 text-slate-600">
         Answer a few quick questions about your shop and we&apos;ll set up a friendly AI receptionist that answers every call
-        and books your jobs. Takes about 10 minutes.
+        and books your jobs. About 10 minutes to go.
       </p>
-      <Link href="/app/setup" className="btn-primary mt-6 px-5 py-3 text-base">
-        Start setup
-      </Link>
+      <p className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-sm text-green-700">
+        <span className="font-semibold">✓</span> Account created — step one is already done.
+      </p>
+      <div className="mt-6">
+        <Link href="/app/setup" className="btn-primary px-5 py-3 text-base">
+          Keep going
+        </Link>
+      </div>
     </div>
   );
 }

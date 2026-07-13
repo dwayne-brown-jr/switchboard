@@ -1,10 +1,12 @@
 # Switchboard Platform
 
 A self-serve web platform where a local service-business owner (auto repair, HVAC,
-home services) signs up, answers a guided wizard about their shop, subscribes, and
-the platform automatically provisions a fully configured AI phone receptionist —
-voice agent, booking calendar, phone number, SMS — then walks them through the two
-things only they can do (call forwarding, texting compliance) and takes them live.
+home services) signs up, answers a guided wizard about their shop, hears their own
+receptionist in a live browser call, subscribes, and the platform automatically
+provisions the rest — booking calendar, phone number, SMS (the voice agent itself is
+created pre-paywall so the owner can talk to it before paying) — then walks them
+through the two things only they can do (call forwarding, texting compliance) and
+takes them live.
 
 **Design philosophy — guardrailed self-serve.** Owners never see or edit a raw agent
 prompt. They edit **structured fields only** (services, prices, hours, FAQs, emergency

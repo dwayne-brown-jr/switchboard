@@ -3,13 +3,19 @@
 Tracked so nothing gets lost. Ordered roughly by when it must be addressed.
 
 ## Before onboarding a 2nd live shop
-- [ ] **Cross-shop calendar isolation.** All shops currently share ONE Cal.com user, so
-      shop A's booking blocks shop B at the same clock-time (user-level busy check),
-      while B's slots may still show it → cross-shop "offer-then-fail." Single-shop
-      availability is correct (one event type per shop, hours synced). Fix options:
-      (1) per-shop Cal.com **managed users** (Cal.com Platform plan + OAuth client creds), or
-      (2) **own the scheduling** (compute slots from shop hours minus that shop's own
-      bookings in our DB — removes Cal.com dependency, fully multi-tenant).
+- [x] **Cross-shop calendar isolation — DONE (2026-07-12, option 2: own the scheduling).**
+      Switchboard now computes availability itself: `lib/scheduling.ts` generates open slots
+      from the shop's live `config.hours` (in the shop's timezone, DST-correct) minus that
+      shop's OWN bookings, stored in the new `Booking` table. The agent tools
+      (`/api/agent/check-availability`, `/api/agent/create-booking`) read/write our DB via
+      `lib/booking.ts` (booking re-validated in a transaction → no double-book). Isolation is
+      now **structural** — each availability query filters by `shopId`, so one shop can never
+      block another. Cal.com fully removed from the availability path (`lib/integrations/calcom.ts`
+      deleted; provision_calendar + publishVersion no longer call it; `Shop.calEventTypeMap` is
+      now legacy/unused). **Deploy step:** apply `prisma/prod-migrations/2026-07-12-add-booking.sql`
+      to prod Turso before/with the deploy (`turso db shell switchboard < …`). Rejected option 1
+      (per-shop Cal.com managed users) — needs a paid Platform plan + OAuth creds + token
+      lifecycle, and still couples core availability to a third party.
 - [ ] **Multi-shop owner UI.** Every owner page resolves the shop via `findFirst` (oldest);
       a second shop per owner is silently unreachable. Add a shop switcher.
 
@@ -34,8 +40,8 @@ Tracked so nothing gets lost. Ordered roughly by when it must be addressed.
       warm_transfer schema needs more discovery.
 - [ ] **Owner account management.** Change email, delete shop/account, data export (also a
       privacy-law requirement).
-- [ ] **Upcoming-appointments view.** Bookings are pushed to Cal.com but never read back
-      into the dashboard.
+- [ ] **Upcoming-appointments view.** Now unblocked — bookings live in our own `Booking`
+      table (see cross-shop isolation above); just needs a dashboard query + UI to surface them.
 - [ ] **Missed-call text-back.** Advertised on the Front Desk plan; not implemented.
 - [ ] **Plan gating.** Plan tiers are currently cosmetic — no feature/volume differences.
 - [ ] **Spanish / multilingual** agent support.

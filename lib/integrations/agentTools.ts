@@ -1,5 +1,4 @@
 import { signPayload } from "../secure";
-import { fuzzyMatchKey } from "../match-service";
 import type { AgentFunction } from "./voice";
 
 // Native agent tools — the call-time endpoints the Retell agent invokes, served
@@ -52,20 +51,4 @@ export function agentFunctions(shopId: string): AgentFunction[] {
 export function agentWebhookUrl(shopId: string): string | null {
   const app = agentBaseUrl();
   return app ? `${app}/api/agent/call-events${q(shopId)}` : null;
-}
-
-/**
- * Resolve a caller-named service to a Cal.com event-type id: exact →
- * case-insensitive → substring match. Only auto-picks when the shop has exactly
- * ONE bookable service; otherwise returns undefined so the caller can decide
- * whether to fall back (availability) or ask for clarification (booking).
- */
-export function resolveEventType(map: Record<string, string>, service?: string): string | undefined {
-  const key = fuzzyMatchKey(Object.keys(map), service);
-  if (key) return map[key];
-  // No name match — auto-pick only when the map resolves to a SINGLE event type
-  // (either one service, or the new model where every service maps to the one
-  // shared appointment event type). Genuinely distinct types stay ambiguous.
-  const uniq = new Set(Object.values(map));
-  return uniq.size === 1 ? [...uniq][0] : undefined;
 }

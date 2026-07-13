@@ -243,7 +243,10 @@ export default function Home() {
             <Reveal>
               <Eyebrow>Pricing</Eyebrow>
               <h2 className="mt-2 font-display text-3xl font-bold text-slate-900 sm:text-4xl">Simple, flat pricing</h2>
-              <p className="mt-3 max-w-xl text-slate-600">Pick a plan when you're ready to go live. No per-call surprises.</p>
+              <p className="mt-3 max-w-xl text-slate-600">
+                Pick a plan when you're ready to go live. No per-call surprises. For context: the average service job is
+                worth $250–$500 — if your receptionist saves one missed call a month, any plan pays for itself.
+              </p>
             </Reveal>
             <div className="mt-10 grid items-start gap-5 sm:grid-cols-3">
               {PLANS.map((p, i) => (

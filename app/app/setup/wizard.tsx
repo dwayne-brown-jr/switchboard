@@ -3,10 +3,13 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { saveDraft, finishWizard, runPrefill } from "./actions";
 import { defaultWizardData, reseedForVertical, composeGreeting } from "@/lib/wizard-defaults";
-import { VERTICAL_DEFS, VERTICALS, DAY_LABELS, VOICES, type Vertical } from "@/lib/verticals";
+import { VERTICAL_DEFS, VERTICALS, DAY_LABELS, VOICES, isVertical, type Vertical } from "@/lib/verticals";
 import type { WizardData } from "@/lib/schemas";
 
 const STEPS = ["Your shop", "Services", "Hours", "Questions", "Emergencies", "Voice", "Review"];
+// Steps already behind the owner before the wizard opens (account + business
+// type pre-selected) — counted so progress never starts at zero.
+const PRE_DONE = 2;
 const US_TIMEZONES = [
   "America/New_York",
   "America/Chicago",
@@ -24,8 +27,28 @@ export function SetupWizard({ initial }: { initial: WizardData | null }) {
   const [maxReached, setMaxReached] = useState<number>(initial?.step ?? 0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [fromDemo, setFromDemo] = useState(false);
 
   const update = (patch: Partial<WizardData>) => setData((d) => ({ ...d, ...patch }));
+
+  // Carry over anything the visitor typed into the landing-page demo so they
+  // don't start from a blank form. Only for a fresh wizard — never a saved draft.
+  useEffect(() => {
+    if (initial) return;
+    try {
+      const raw = localStorage.getItem("sb-demo");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { vertical?: string; business?: string; city?: string };
+      if (!saved.business && !saved.city) return;
+      setData((d) => {
+        const base = saved.vertical && isVertical(saved.vertical) && saved.vertical !== d.vertical ? reseedForVertical(d, saved.vertical) : d;
+        return { ...base, businessName: saved.business ?? base.businessName, city: saved.city ?? base.city };
+      });
+      setFromDemo(true);
+      localStorage.removeItem("sb-demo");
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function goto(next: number) {
     setError("");
@@ -79,9 +102,27 @@ export function SetupWizard({ initial }: { initial: WizardData | null }) {
     });
   }
 
+  const pct = Math.round(((PRE_DONE + step) / (PRE_DONE + STEPS.length)) * 100);
+
   return (
     <div className="mx-auto max-w-2xl">
+      <div className="mb-4">
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="text-slate-500">
+            <span className="font-semibold text-green-600">✓</span> Account created · {STEPS[step]}
+          </span>
+          <span className="font-semibold text-brand-700">{pct}% done</span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
       <Stepper step={step} maxReached={maxReached} onJump={jumpTo} />
+      {fromDemo && (
+        <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+          ✓ We kept what you tried in the demo — tweak anything below.
+        </p>
+      )}
       <div className="card mt-6 p-6 sm:p-8">
         {step === 0 && <BusinessStep data={data} update={update} />}
         {step === 1 && <ServicesStep data={data} update={update} />}
@@ -148,16 +189,14 @@ function Stepper({ step, maxReached, onJump }: { step: number; maxReached: numbe
 // Step 0 — Business
 // --------------------------------------------------------------------------
 function BusinessStep({ data, update }: StepProps) {
-  const [detecting, setDetecting] = useState(false);
-  function detectTz() {
-    setDetecting(true);
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) update({ timezone: tz });
-    } finally {
-      setDetecting(false);
-    }
-  }
+  // Fill the time zone from the browser up front — most owners never need to
+  // touch it, and the select stays as the override.
+  useEffect(() => {
+    if (data.timezone) return;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) update({ timezone: tz });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="space-y-5">
       <Header title="Tell us about your shop" subtitle="The basics your receptionist needs to greet callers." />
@@ -193,21 +232,16 @@ function BusinessStep({ data, update }: StepProps) {
         <Field label="City">
           <input className="input" value={data.city} onChange={(e) => update({ city: e.target.value })} placeholder="e.g. Austin, TX" />
         </Field>
-        <Field label="Time zone">
-          <div className="flex gap-2">
-            <select className="input" value={data.timezone} onChange={(e) => update({ timezone: e.target.value })}>
-              <option value="">Select…</option>
-              {US_TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz.replace("America/", "").replace("Pacific/", "").replace("_", " ")}
-                </option>
-              ))}
-              {data.timezone && !US_TIMEZONES.includes(data.timezone) && <option value={data.timezone}>{data.timezone}</option>}
-            </select>
-            <button type="button" className="btn-secondary whitespace-nowrap" onClick={detectTz} disabled={detecting}>
-              Detect
-            </button>
-          </div>
+        <Field label="Time zone" hint="Detected from your browser — change it if it's wrong.">
+          <select className="input" value={data.timezone} onChange={(e) => update({ timezone: e.target.value })}>
+            <option value="">Select…</option>
+            {US_TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz.replace("America/", "").replace("Pacific/", "").replace("_", " ")}
+              </option>
+            ))}
+            {data.timezone && !US_TIMEZONES.includes(data.timezone) && <option value={data.timezone}>{data.timezone}</option>}
+          </select>
         </Field>
       </div>
       <Field label="Website (optional)" hint="We can read your site to fill in services and hours for you.">
@@ -383,6 +417,14 @@ function FaqsStep({ data, update }: StepProps) {
 function EmergenciesStep({ data, update }: StepProps) {
   const def = VERTICAL_DEFS[data.vertical as Vertical];
   const [custom, setCustom] = useState("");
+  // Pre-fill the alert number with the owner's mobile as a REAL value, not a
+  // placeholder — most owners keep the default, so make the default visible.
+  useEffect(() => {
+    if (!data.emergencies.alertNumber.trim() && data.ownerMobile.trim()) {
+      update({ emergencies: { ...data.emergencies, alertNumber: data.ownerMobile } });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const active = new Set(data.emergencies.rules);
   function toggle(rule: string) {
     const set = new Set(active);
@@ -424,7 +466,7 @@ function EmergenciesStep({ data, update }: StepProps) {
           Add
         </button>
       </div>
-      <Field label="Alert this number for emergencies" hint="We'll text/call here. Defaults to your mobile.">
+      <Field label="Alert this number for emergencies" hint="We've filled in your mobile — change it if alerts should go somewhere else.">
         <input
           className="input"
           value={data.emergencies.alertNumber}

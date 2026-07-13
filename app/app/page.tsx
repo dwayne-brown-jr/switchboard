@@ -6,6 +6,7 @@ import { MeetReceptionist } from "./meet-receptionist";
 import { SetupChecklist } from "./setup-checklist";
 import { Dashboard } from "./dashboard";
 import { getDashboardData, getRecentCalls, type Period } from "@/lib/stats";
+import { openBillingPortal } from "./subscribe/actions";
 
 export default async function AppHome({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const user = await requireUser();
@@ -28,7 +29,41 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
     const p = Number((await searchParams).period);
     const period: Period = p === 7 || p === 90 ? p : 30;
     const [data, calls] = await Promise.all([getDashboardData(shop.id, period), getRecentCalls(shop.id)]);
-    return <Dashboard shop={shop} data={data} calls={calls} period={period} />;
+    // Texting (a2p) is optional and doesn't block going live — surface it here so
+    // a live owner can still finish registration to turn SMS on.
+    const a2pStep = shop.run.steps.find((s) => s.key === "a2p");
+    const textingPending =
+      !!a2pStep && a2pStep.status !== "done" && a2pStep.status !== "skipped" && shop.a2pStatus !== "approved";
+    const pastDue = shop.subStatus === "past_due" || shop.subStatus === "unpaid";
+    return (
+      <div className="space-y-6">
+        {pastDue && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="font-semibold text-red-800">Payment failed — update your card</p>
+            <p className="mt-1 text-sm text-red-700">
+              We couldn&apos;t process your latest payment. Your receptionist is still answering for now, but please
+              update your card soon to avoid any interruption.
+            </p>
+            <form action={openBillingPortal} className="mt-3">
+              <button type="submit" className="btn-primary">Update payment</button>
+            </form>
+          </div>
+        )}
+        {textingPending && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+            <p className="font-semibold text-brand-900">Turn on texting (optional)</p>
+            <p className="mt-1 text-sm text-brand-800">
+              Register your business so your receptionist can text booking alerts and reply to customers. It runs in the
+              background and won&apos;t affect your live calls.
+            </p>
+            <Link href="/app/go-live" className="btn-primary mt-3">
+              Set up texting
+            </Link>
+          </div>
+        )}
+        <Dashboard shop={shop} data={data} calls={calls} period={period} />
+      </div>
+    );
   }
 
   const version = shop.versions[0];

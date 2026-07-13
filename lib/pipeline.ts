@@ -25,14 +25,18 @@ export const PIPELINE: StepDef[] = [
   // to their own receptionist (in-browser web call) before picking a plan.
   // Creating the agent is free; the paid pieces (number, calendar) stay gated.
   { key: "provision_voice", type: "auto", title: "Give it a voice", blurb: "We set up the voice that answers your calls.", phase: 2 },
-  { key: "subscribe", type: "user", title: "Start your subscription", blurb: "Pick a plan to activate your receptionist.", phase: 2 },
+  { key: "subscribe", type: "user", title: "Start your subscription", blurb: "Start your subscription to activate your receptionist.", phase: 2 },
   { key: "provision_calendar", type: "auto", title: "Connect your calendar", blurb: "We set up your booking calendar.", phase: 2 },
   { key: "provision_number", type: "auto", title: "Get your phone number", blurb: "We get a local number for your receptionist.", phase: 2 },
   { key: "register_pipeline", type: "auto", title: "Wire it all together", blurb: "We connect the pieces behind the scenes.", phase: 2 },
   { key: "test_agent", type: "user", title: "Give it a test call", blurb: "Call your new receptionist and make sure it sounds right.", phase: 2 },
   { key: "forwarding", type: "user", title: "Forward your calls", blurb: "Send unanswered calls to your receptionist — we'll verify it works.", phase: 2 },
-  { key: "a2p", type: "user", title: "Turn on texting", blurb: "Register your business so it can text customers (runs in the background).", phase: 2 },
+  // go_live comes BEFORE a2p on purpose: finishing forwarding takes the shop
+  // live immediately. Texting registration (a2p) is a genuinely optional,
+  // background step that must never block going live — an owner who never acts
+  // on it is still live and answering calls.
   { key: "go_live", type: "auto", title: "Go live", blurb: "Your receptionist starts answering calls.", phase: 2 },
+  { key: "a2p", type: "user", title: "Turn on texting", blurb: "Register your business so it can text customers (optional, runs in the background).", phase: 2 },
 ];
 
 export const STEP_ORDER: Record<string, number> = Object.fromEntries(

@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
 import { syncSubscription, handleCheckoutCompleted } from "@/lib/billing-sync";
+import { reportError } from "@/lib/observability";
 
 // Stripe webhook. Verifies signature, dedupes via WebhookEvent, and syncs
 // subscription state. Idempotent — a replayed event is skipped.
@@ -40,7 +41,12 @@ export async function POST(req: Request) {
         break;
     }
   } catch (e) {
-    console.error("stripe webhook handler error", e);
+    // Surface the failure to Sentry/Slack + the in-app feed — a silently failing
+    // billing sync is otherwise invisible.
+    await reportError(e, { source: "webhook", route: "webhooks/stripe", extra: { eventType: event.type, eventId: event.id } });
+    // We recorded the event id for idempotency BEFORE handling; drop it so
+    // Stripe's automatic retry re-processes instead of being skipped as a dup.
+    await prisma.webhookEvent.delete({ where: { id: event.id } }).catch(() => {});
     return NextResponse.json({ error: "handler failed" }, { status: 500 });
   }
 

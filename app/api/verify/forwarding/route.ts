@@ -4,6 +4,7 @@ import { markVerified } from "@/lib/forwarding";
 import { secretEquals } from "@/lib/secure";
 import { rateLimit } from "@/lib/ratelimit";
 import { clientIp } from "@/lib/clientip";
+import { reportError } from "@/lib/observability";
 
 // Called when the shop's agent receives the forwarded verification call (posted
 // by n8n / the voice provider). Authenticated by the shop's ingest secret so
@@ -26,6 +27,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const ok = await markVerified(shopId);
-  return NextResponse.json({ verified: ok });
+  try {
+    const ok = await markVerified(shopId);
+    return NextResponse.json({ verified: ok });
+  } catch (e) {
+    await reportError(e, { source: "webhook", route: "verify/forwarding", shopId });
+    return NextResponse.json({ error: "verify failed" }, { status: 500 });
+  }
 }

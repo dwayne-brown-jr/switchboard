@@ -244,20 +244,20 @@ export default function Home() {
               <Eyebrow>Pricing</Eyebrow>
               <h2 className="mt-2 font-display text-3xl font-bold text-slate-900 sm:text-4xl">Simple, flat pricing</h2>
               <p className="mt-3 max-w-xl text-slate-600">
-                Pick a plan when you're ready to go live. No per-call surprises. For context: the average service job is
-                worth $250–$500 — if your receptionist saves one missed call a month, any plan pays for itself.
+                One flat price, ready when you are to go live. No per-call surprises. For context: the average service job
+                is worth $250–$500 — if your receptionist saves one missed call a month, it pays for itself.
               </p>
             </Reveal>
-            <div className="mt-10 grid items-start gap-5 sm:grid-cols-3">
+            <div className={`mt-10 items-start gap-5 ${PLANS.length === 1 ? "mx-auto max-w-sm" : "grid sm:grid-cols-3"}`}>
               {PLANS.map((p, i) => (
                 <Reveal
                   key={p.id}
                   delay={i * 90}
                   className={`relative flex flex-col rounded-2xl border bg-white p-6 transition duration-300 hover:-translate-y-1 ${
-                    p.popular ? "border-accent-300 shadow-xl shadow-accent-500/10 lg:scale-[1.04]" : "border-slate-200 hover:shadow-lg"
+                    p.popular ? "border-accent-300 shadow-xl shadow-accent-500/10" : "border-slate-200 hover:shadow-lg"
                   }`}
                 >
-                  {p.popular && (
+                  {p.popular && PLANS.length > 1 && (
                     <span className="absolute -top-3 left-6 rounded-full bg-accent-500 px-2.5 py-0.5 text-xs font-semibold text-white shadow-sm shadow-accent-500/30">Most popular</span>
                   )}
                   <h3 className="font-display text-lg font-bold text-slate-900">{p.name}</h3>

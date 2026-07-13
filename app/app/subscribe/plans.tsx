@@ -25,15 +25,17 @@ export function PlanPicker({ stripeConfigured }: { stripeConfigured: boolean }) 
     });
   }
 
+  const single = PLANS.length === 1;
+
   return (
     <div>
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className={single ? "mx-auto max-w-sm" : "grid gap-5 md:grid-cols-3"}>
         {PLANS.map((p) => (
           <div
             key={p.id}
             className={`card relative flex flex-col p-6 ${p.popular ? "ring-2 ring-brand-500" : ""}`}
           >
-            {p.popular && (
+            {p.popular && !single && (
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white">
                 Most popular
               </span>
@@ -57,7 +59,7 @@ export function PlanPicker({ stripeConfigured }: { stripeConfigured: boolean }) 
               disabled={pending}
               onClick={() => choose(p.id)}
             >
-              {busyPlan === p.id ? "Starting…" : `Choose ${p.name}`}
+              {busyPlan === p.id ? "Starting…" : single ? "Get started" : `Choose ${p.name}`}
             </button>
           </div>
         ))}

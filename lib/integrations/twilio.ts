@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 
 // Twilio integration — buy a local number for the shop's agent, and (Phase-2
 // walls) A2P 10DLC registration. Real REST calls when TWILIO_ACCOUNT_SID +
@@ -63,6 +64,30 @@ export async function attachNumberToAgent(numberSid: string, voiceUrl: string): 
   const c = creds();
   if (!c) return;
   await form(`${API}/Accounts/${c.sid}/IncomingPhoneNumbers/${numberSid}.json`, "POST", c.sid, c.token, { VoiceUrl: voiceUrl });
+}
+
+/** Point inbound SMS on the number at our webhook (STOP/HELP handling).
+ *  Mock is a no-op. */
+export async function configureNumberSmsWebhook(numberSid: string, smsUrl: string): Promise<void> {
+  const c = creds();
+  if (!c || numberSid.startsWith("PNmock")) return;
+  await form(`${API}/Accounts/${c.sid}/IncomingPhoneNumbers/${numberSid}.json`, "POST", c.sid, c.token, {
+    SmsUrl: smsUrl,
+    SmsMethod: "POST",
+  });
+}
+
+/** Verify Twilio's X-Twilio-Signature on a webhook: HMAC-SHA1 over the exact
+ *  public URL + the POST params sorted by key, keyed by the auth token. Returns
+ *  true in mock mode (no creds) so dev flows work. */
+export function validateTwilioSignature(url: string, params: Record<string, string>, signature: string | null): boolean {
+  const c = creds();
+  if (!c) return true;
+  if (!signature) return false;
+  const data = url + Object.keys(params).sort().map((k) => k + params[k]).join("");
+  const expected = crypto.createHmac("sha1", c.token).update(Buffer.from(data, "utf-8")).digest();
+  const given = Buffer.from(signature, "base64");
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
 }
 
 /** Attach a purchased number to the platform's Elastic SIP trunk, so inbound
@@ -162,6 +187,10 @@ export async function submitA2P(shopId: string, info: A2PBusinessInfo, numberSid
   }).catch(() => ({ sid: `BN_${shopId}` }));
   const messaging = await form<{ sid: string }>(`${MESSAGING}/Services`, "POST", c.sid, c.token, {
     FriendlyName: `sb_${shopId}`,
+    // Keep inbound SMS routed to the NUMBER's own webhook (our STOP/HELP
+    // handler) — otherwise attaching the number to the service would swallow
+    // inbound messages (the service has no inbound URL of its own).
+    UseInboundWebhookOnNumber: "true",
   });
   await form(`${MESSAGING}/Services/${messaging.sid}/PhoneNumbers`, "POST", c.sid, c.token, { PhoneNumberSid: numberSid }).catch(() => {});
   return { brandSid: brand.sid, campaignSid: `CM_${shopId}`, messagingServiceSid: messaging.sid, status: "submitted" };

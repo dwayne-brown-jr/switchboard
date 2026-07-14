@@ -129,7 +129,10 @@ model Shop {
   calEventTypeMap Json? // LEGACY (pre-owned-scheduling Cal.com event-type map); unused — availability is now computed from config hours + own Booking rows
   a2pBrandSid    String?
   a2pCampaignSid String?
+  a2pMessagingServiceSid String?
   a2pStatus      String? // not_started | submitted | approved | failed
+  smsConsentAt   DateTime? // owner agreed to receive automated texts (A2P wall)
+  smsOptOut      Boolean @default(false) // owner replied STOP to the agent number
   liveVersionId  String?
   ingestSecret   String? // per-shop secret for the call-ingest endpoint
   digestOptOut   Boolean @default(false) // owner unsubscribed from the weekly digest

@@ -89,10 +89,10 @@ export async function simulateForwarded() {
 }
 
 // --- a2p ------------------------------------------------------------------
-export async function submitA2PInfo(info: A2PBusinessInfo) {
+export async function submitA2PInfo(info: A2PBusinessInfo, smsConsent: boolean) {
   const user = await requireUser();
   const shop = await ownerShop(user.id);
-  await doSubmitA2P(shop.id, info);
+  await doSubmitA2P(shop.id, info, smsConsent);
   redirect("/app/go-live");
 }
 

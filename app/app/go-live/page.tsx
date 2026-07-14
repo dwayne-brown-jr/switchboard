@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { getLiveConfig } from "@/lib/booking";
+import { verticalDef } from "@/lib/verticals";
 import { TestAgentWall, ForwardingWall, A2PWall } from "./walls";
 
 const WALLS = [
@@ -24,6 +26,11 @@ export default async function GoLivePage() {
 
   const stepResult = (key: string) => shop.run!.steps.find((s) => s.key === key)?.result as Record<string, unknown> | null;
   const agentNumber = shop.agentNumber ?? "your receptionist number";
+  // A vertical-appropriate example service for the test-call hint ("try booking
+  // a deep cleaning") — prefer what the owner actually configured.
+  const config = await getLiveConfig(shop.id);
+  const sampleService =
+    config?.services.find((s) => s.bookable)?.service ?? verticalDef(shop.vertical).services[0]?.service;
   // A mock/placeholder number comes from the mock Twilio provider (PNmock…).
   const hasRealNumber = !!shop.twilioNumberSid && !shop.twilioNumberSid.startsWith("PNmock");
   const devMode = process.env.NODE_ENV !== "production";
@@ -58,6 +65,7 @@ export default async function GoLivePage() {
             agentNumber={agentNumber}
             hasRealNumber={hasRealNumber}
             priorNote={(stepResult("test_agent")?.note as string) || undefined}
+            sampleService={sampleService}
           />
         )}
         {current === "forwarding" && (

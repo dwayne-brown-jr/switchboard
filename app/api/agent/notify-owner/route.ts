@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authAgentShop } from "@/lib/agentAuth";
 import { sendSms } from "@/lib/integrations/twilio";
+import { canSendSms } from "@/lib/a2p";
 import { rateLimit } from "@/lib/ratelimit";
 import { reportError } from "@/lib/observability";
 
@@ -20,8 +21,8 @@ export async function POST(req: Request) {
     if (!shop.ownerMobile || !shop.agentNumber) {
       return NextResponse.json({ ok: true, delivered: false, note: "no owner number on file" });
     }
-    if (shop.a2pStatus !== "approved") {
-      return NextResponse.json({ ok: true, delivered: false, note: "texting not yet enabled" });
+    if (!canSendSms(shop)) {
+      return NextResponse.json({ ok: true, delivered: false, note: "texting not enabled" });
     }
     if (!(await rateLimit("agentNotify", shop.id))) {
       return NextResponse.json({ ok: true, delivered: false, note: "rate limited" });

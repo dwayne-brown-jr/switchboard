@@ -30,7 +30,7 @@ Goal: we can lawfully answer, record, and text on behalf of a paying business.
 - [ ] 🤖👤 **In-app A2P submission wired into onboarding** — `lib/a2p.ts` (`submitA2P`/`pollA2P`) exists but was never run to completion; make it part of the signup flow so every new shop registers automatically instead of manually. *Build done; needs your Twilio brand approved first.*
 - [x] ✅🤖 **Call-recording disclosure in-agent** — DONE: a spoken "this call may be recorded" is now baked into the first-sentence `DISCLOSURE` block of all 6 templates (two-party-consent safe). *Riverside's already-live agent needs a republish to pick it up; new shops get it automatically. Per-state suppression (skip in one-party states) is a possible later optimization.*
 - [ ] 🏛️👤 **Terms & Privacy real review** — pages exist (`app/terms`, `app/privacy`) but are unreviewed boilerplate. Needs a real pass (data handling, call recording, SMS consent language, cancellation).
-- [ ] 🤖 **SMS consent + opt-out** — confirm STOP/HELP handling and that owners opted in. Required for A2P approval anyway.
+- [x] ✅🤖 **SMS consent + opt-out** — DONE: inbound-SMS webhook (`/api/webhooks/twilio/sms`, signature-verified) handles STOP/START/HELP; STOP persists `smsOptOut` on the shop and both SMS send paths gate on it via `canSendSms`; the A2P wall now requires an explicit opt-in checkbox (stored as `smsConsentAt`). Numbers get their `SmsUrl` wired at provisioning + re-wired at A2P submit. *Prod DB needs `prisma/prod-migrations/2026-07-13-sms-consent.sql`.*
 
 ## GATE B — Self-serve reliability (a stranger onboards unattended)
 
@@ -38,7 +38,7 @@ Goal: someone who isn't you signs up and gets a working number + live agent with
 
 - [x] ✅🤖 **Onboarding self-heals** — DONE: `onboarding-sweep` cron reconciles subscribe-stalled runs against Stripe (missed webhook), resumes crashed auto-passes, and pages admins on runs stuck >72h. Also fixed a Stripe-webhook dedupe bug that dropped failed events on retry. *(Still worth doing: one real untouched cold-path run — see Gate E.)*
 - [x] ✅🤖 **A2P no longer blocks go-live** — DONE: pipeline reordered so finishing forwarding takes the shop live; texting (a2p) became an optional post-live nudge that can never stall onboarding.
-- [ ] 🤖 **Onboarding correctness across verticals** — verified for auto repair. Sanity-check booking + service resolution for the other business types you advertise (HVAC, cleaning, detailing, etc.).
+- [x] ✅🤖 **Onboarding correctness across verticals** — DONE: cross-vertical sanity suite (`lib/verticals.test.ts`) verifies every advertised vertical has a complete catalog/template/booking-fields set and that service resolution handles realistic caller phrasing per vertical (`lib/match-service.test.ts`); bookings now normalize the caller's free-text service to the shop's catalog name when it clearly matches (ambiguous stays raw — never guesses); the go-live test-call hint is vertical-aware instead of hardcoded "oil change". *Deferred to BACKLOG: per-service durations (all slots are 60 min) + landing-page demo agents for the 3 verticals without one.*
 - [x] ✅🤖 **Number reclamation on cancel** — DONE: cancel → `"canceled"` + 30-day grace → daily `reclaim-numbers` cron releases the Twilio number (resubscribe within grace restores it).
 
 ## GATE C — Billing integrity (money in = access, money stops = access stops)

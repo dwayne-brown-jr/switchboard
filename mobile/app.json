@@ -14,7 +14,12 @@
     "android": {
       "package": "com.switchboard.owner"
     },
-    "plugins": ["expo-secure-store", "expo-notifications"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-asset",
+      "expo-audio"
+    ],
     "extra": {
       "eas": {
         "projectId": ""

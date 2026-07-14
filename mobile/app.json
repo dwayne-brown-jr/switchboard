@@ -9,10 +9,17 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.switchboard.owner"
+      "bundleIdentifier": "com.switchboard.owner",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.switchboard.owner"
+      "package": "com.switchboard.owner",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       "expo-secure-store",
@@ -22,8 +29,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "ad014206-95d5-462c-a0df-a38ff893d979"
       }
-    }
+    },
+    "owner": "dlb8"
   }
 }

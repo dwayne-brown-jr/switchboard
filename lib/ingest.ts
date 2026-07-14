@@ -40,6 +40,17 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
     update: data,
   });
 
+  // Forwarding self-verify: while a shop is still onboarding, an inbound call
+  // during an active forwarding-verification window IS the proof that call
+  // forwarding works. Nothing else completes that step now that the n8n broker
+  // is gone, so it's wired here — fires for ANY call (a verification call isn't
+  // "booked" or "urgent"). markVerified is a safe no-op unless the forwarding
+  // step is actively "verifying" within its window. Best-effort; never blocks.
+  if (shop.status !== "live") {
+    const { markVerified } = await import("./forwarding");
+    await markVerified(shop.id).catch((e) => console.error("forwarding auto-verify failed", e));
+  }
+
   // Real-time owner backstop — only on genuinely-new booked/urgent calls.
   if (!existing && (p.hot_job || p.booked)) {
     const kind = p.hot_job ? "emergency" : "booked";
@@ -61,8 +72,10 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
 
     // SMS — on BOOKINGS only. Emergencies are already texted by the agent's
     // notify_owner tool mid-call, so a second text here would just be a dup.
-    // Gated on A2P approval (compliance) + an owner mobile + the shop's number.
-    if (kind === "booked" && shop.a2pStatus === "approved" && shop.ownerMobile && shop.agentNumber) {
+    // Gated on A2P approval + no STOP on file (compliance) + an owner mobile
+    // + the shop's number.
+    const { canSendSms } = await import("./a2p");
+    if (kind === "booked" && canSendSms(shop) && shop.ownerMobile && shop.agentNumber) {
       const { sendSms } = await import("./integrations/twilio");
       const { toE164 } = await import("./phone");
       const to = toE164(shop.ownerMobile);

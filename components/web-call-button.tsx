@@ -9,7 +9,7 @@ import { startWebCall } from "@/app/app/go-live/actions";
 export function WebCallButton({
   title = "Talk to your receptionist right here",
   subtitle = "No phone needed — we'll use your computer's mic and speaker.",
-  liveHint = "Connected — say “I’d like to book an oil change.”",
+  liveHint = "Connected — try booking an appointment.",
 }: {
   title?: string;
   subtitle?: string;

@@ -1,5 +1,6 @@
 import { prisma } from "./db";
-import { submitA2P as twilioSubmitA2P, getA2PStatus, type A2PBusinessInfo } from "./integrations/twilio";
+import { submitA2P as twilioSubmitA2P, getA2PStatus, configureNumberSmsWebhook, type A2PBusinessInfo } from "./integrations/twilio";
+import { agentBaseUrl } from "./integrations/agentTools";
 import { scheduleJob } from "./qstash";
 import { completeUserStep } from "./engine";
 import { notifyAdmins } from "./notify";
@@ -11,22 +12,42 @@ import { logAudit } from "./audit";
 // go-live — the a2p step completes on submit (or skip); only SMS *features* wait
 // for carrier approval.
 
-/** True once texting is approved — gates all SMS-dependent features. */
-export function canSendSms(shop: { a2pStatus: string | null }): boolean {
-  return shop.a2pStatus === "approved";
+/** True once texting is approved AND the owner hasn't replied STOP — gates all
+ *  SMS-dependent features. */
+export function canSendSms(shop: { a2pStatus: string | null; smsOptOut?: boolean }): boolean {
+  return shop.a2pStatus === "approved" && !shop.smsOptOut;
 }
 
-export async function submitA2P(shopId: string, info: A2PBusinessInfo) {
+export async function submitA2P(shopId: string, info: A2PBusinessInfo, smsConsent: boolean) {
   const shop = await prisma.shop.findUnique({ where: { id: shopId }, include: { run: true } });
   if (!shop?.run) throw new Error("Setup not ready.");
   if (!shop.twilioNumberSid) throw new Error("Phone number not provisioned yet.");
+  // A2P campaigns require documented opt-in — no consent, no texting.
+  if (!smsConsent) throw new Error("Please agree to receive text alerts (or skip texting for now).");
 
   const res = await twilioSubmitA2P(shopId, info, shop.twilioNumberSid);
   await prisma.shop.update({
     where: { id: shopId },
-    data: { a2pBrandSid: res.brandSid, a2pCampaignSid: res.campaignSid, a2pStatus: "submitted" },
+    data: {
+      a2pBrandSid: res.brandSid,
+      a2pCampaignSid: res.campaignSid,
+      a2pMessagingServiceSid: res.messagingServiceSid,
+      a2pStatus: "submitted",
+      // Fresh explicit consent re-opts-in (clears a stale STOP).
+      smsConsentAt: new Date(),
+      smsOptOut: false,
+    },
   });
-  await logAudit(shopId, null, "a2p.submitted", { brandSid: res.brandSid });
+  await logAudit(shopId, null, "a2p.submitted", { brandSid: res.brandSid, smsConsent: true });
+
+  // (Re)point the number's inbound SMS at the STOP/HELP webhook — provisioning
+  // already tries this, but only when APP_URL was public at the time.
+  const publicApp = agentBaseUrl();
+  if (publicApp) {
+    await configureNumberSmsWebhook(shop.twilioNumberSid, `${publicApp}/api/webhooks/twilio/sms`).catch((e) =>
+      console.error("sms webhook config failed", e),
+    );
+  }
 
   // Poll for approval in the background (does not block go-live).
   await scheduleJob("/api/jobs/a2p-poll", { shopId }, 3 * 60 * 60); // every few hours

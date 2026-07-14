@@ -45,6 +45,13 @@ Tracked so nothing gets lost. Ordered roughly by when it must be addressed.
 - [ ] **Missed-call text-back.** Advertised on the Front Desk plan; not implemented.
 - [ ] **Plan gating.** Plan tiers are currently cosmetic — no feature/volume differences.
 - [ ] **Spanish / multilingual** agent support.
+- [ ] **Per-service appointment durations.** Every booking is a fixed 60-min slot
+      (`SLOT_MINUTES`), which is wrong for e.g. a vehicle wrap or post-construction
+      cleaning. When added, also make `check-availability` honor the `service` param
+      its tool schema already advertises (the route currently ignores it).
+- [ ] **Demo agents for all verticals.** Landing-page live demo only exists for
+      auto / auto_appearance / hvac; cleaning, home_services, and other fall back to
+      an HVAC prompt (`lib/demo.ts`).
 
 ## Owner mobile app (see separate plan)
 - [ ] Phase 0: authenticated API layer + push notification delivery.

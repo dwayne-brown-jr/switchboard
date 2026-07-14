@@ -31,8 +31,9 @@ Do the **Phase-1 group** first; add the **Phase-2 group** when you start Phase 2
    `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN`. **Upgrade off trial** (add a card) —
    required to buy real numbers (~$1–2/mo each) and to submit A2P.
 9. **Stripe** — [dashboard.stripe.com](https://dashboard.stripe.com) (Test mode first) →
-   Developers → API keys → secret key → `STRIPE_SECRET_KEY`; create 3 Products with
-   monthly Prices (Catch / Front Desk / Growth) → copy price IDs → `STRIPE_PRICE_*`;
+   Developers → API keys → secret key → `STRIPE_SECRET_KEY`; create the single
+   launch Product ("Switchboard", $149/mo Price) → price ID → `STRIPE_PRICE_FRONT_DESK`
+   (the legacy tier envs `STRIPE_PRICE_CATCH`/`STRIPE_PRICE_GROWTH` are unused at launch);
    Developers → Webhooks → add endpoint `{APP_URL}/api/webhooks/stripe` → signing secret
    → `STRIPE_WEBHOOK_SECRET`.
 10. **Upstash** — [console.upstash.com](https://console.upstash.com) → QStash →

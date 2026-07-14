@@ -37,10 +37,12 @@ export function TestAgentWall({
   agentNumber,
   priorNote,
   hasRealNumber,
+  sampleService,
 }: {
   agentNumber: string;
   priorNote?: string;
   hasRealNumber: boolean;
+  sampleService?: string;
 }) {
   const [pending, start] = useTransition();
   const [showProblem, setShowProblem] = useState(false);
@@ -62,7 +64,9 @@ export function TestAgentWall({
       </div>
 
       {/* Primary: in-browser web call — always works, no phone number needed. */}
-      <WebCallButton />
+      <WebCallButton
+        liveHint={`Connected — try booking ${sampleService ? `a ${sampleService.toLowerCase()}` : "an appointment"}.`}
+      />
 
       {/* The dialable number: real once Twilio is set up, otherwise a placeholder. */}
       {hasRealNumber ? (
@@ -265,6 +269,7 @@ export function A2PWall({ defaults }: { defaults: Partial<A2PBusinessInfo> }) {
     phone: defaults.phone ?? "",
     website: defaults.website ?? "",
   });
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState("");
 
   const set = (k: keyof A2PBusinessInfo, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -274,10 +279,14 @@ export function A2PWall({ defaults }: { defaults: Partial<A2PBusinessInfo> }) {
       setError("Please fill in your legal business name, EIN, address, and contact email.");
       return;
     }
+    if (!consent) {
+      setError("Please agree to receive text alerts — carriers require documented opt-in.");
+      return;
+    }
     setError("");
     start(async () => {
       try {
-        await submitA2PInfo(form);
+        await submitA2PInfo(form, consent);
       } catch (e) {
         const msg = (e as Error).message;
         if (!msg?.includes("NEXT_REDIRECT")) setError(msg);
@@ -315,6 +324,19 @@ export function A2PWall({ defaults }: { defaults: Partial<A2PBusinessInfo> }) {
           <input className="input" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} placeholder="jane@riversideauto.com" />
         </Field>
       </div>
+
+      <label className="flex items-start gap-2.5 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+        />
+        <span>
+          I agree to receive automated text alerts about my business (new bookings, urgent calls) at my mobile number.
+          Message frequency varies; message &amp; data rates may apply. Reply STOP to unsubscribe, HELP for help.
+        </span>
+      </label>
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "../db";
 import { isPaying } from "../stripe";
 import { defaultVoiceProvider } from "../integrations/voice";
-import { searchAndBuyNumber, attachNumberToTrunk } from "../integrations/twilio";
+import { searchAndBuyNumber, attachNumberToTrunk, configureNumberSmsWebhook } from "../integrations/twilio";
 import { importPhoneNumber } from "../integrations/retell";
 import { agentFunctions, agentWebhookUrl, agentBaseUrl } from "../integrations/agentTools";
 import type { ShopConfig } from "../schemas";
@@ -91,21 +91,38 @@ export const provisionNumberHandler: AutoHandler = async ({ shop }) => {
   // Persist immediately so a retry never buys a second number.
   await prisma.shop.update({ where: { id: shop.id }, data: { twilioNumberSid: sid, agentNumber: phoneNumber } });
 
+  // Route inbound SMS to our STOP/HELP compliance webhook. Best-effort here
+  // (the step's reuse-check would skip it on retry); A2P submit re-runs it.
+  const publicApp = agentBaseUrl();
+  if (publicApp) {
+    await configureNumberSmsWebhook(sid, `${publicApp}/api/webhooks/twilio/sms`).catch((e) => console.error("sms webhook config failed", e));
+  }
+
   // Route inbound calls to the agent: attach the number to the platform SIP
   // trunk, then import it into Retell bound to this shop's agent. When the trunk
   // isn't configured (dev/mock), skip — the number is still bought.
   const termUri = process.env.TWILIO_SIP_TERMINATION_URI;
-  if (termUri && shop.agentId && shop.agentProvider === "retell") {
+  const canRoute = !!(termUri && shop.agentId && shop.agentProvider === "retell");
+  if (canRoute) {
     await attachNumberToTrunk(sid);
     await importPhoneNumber({
       phoneNumber,
       terminationUri: termUri,
       username: process.env.TWILIO_SIP_USERNAME ?? "",
       password: process.env.TWILIO_SIP_PASSWORD ?? "",
-      agentId: shop.agentId,
+      agentId: shop.agentId!, // canRoute guarantees non-null
     });
+  } else if (process.env.NODE_ENV === "production") {
+    // A number was purchased but NOT routed to the agent (missing SIP config or
+    // agent id) — the shop can still reach "live" but its real number never
+    // reaches the AI: a silent half-live shop. Surface it loudly so it's caught.
+    const { reportError } = await import("../observability");
+    await reportError(
+      new Error(`Number ${phoneNumber} bought but not routed to the agent (SIP/agent config missing) — shop ${shop.id} would be half-live`),
+      { source: "provisioning", route: "provision_number:unrouted", shopId: shop.id, level: "warn" },
+    );
   }
-  return done({ number: phoneNumber, sid, voiceRouted: !!termUri });
+  return done({ number: phoneNumber, sid, voiceRouted: canRoute });
 };
 
 // 10 — register_pipeline

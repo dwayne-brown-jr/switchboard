@@ -6,11 +6,17 @@ import { logAudit } from "./audit";
 
 // Forwarding verification. We place an outbound call to the shop's business
 // line and tell the owner NOT to answer. If no-answer forwarding is configured,
-// that call lands on the agent number; the agent's inbound-call event hits
-// /api/verify/forwarding within ~60s and we mark the step verified. A QStash
-// job times the attempt out after 2 minutes.
-
-const WINDOW_MS = 90_000;
+// that call lands on the agent number, the agent answers, and when that call
+// ends its call-events webhook (recordCall) marks the step verified — see the
+// forwarding self-verify hook in lib/ingest.ts. (The old n8n → /api/verify/
+// forwarding callback is gone; the app is the broker now.) A QStash job times
+// the attempt out if no forwarded call is detected.
+//
+// The window must cover the full round trip: no-answer ring (~20-30s) + the
+// agent call (~20s of verify TwiML) + the call-ENDED webhook delay. It's kept
+// a bit larger than the timeout so a call that lands just before the timeout
+// still counts.
+const WINDOW_MS = 165_000;
 
 type ForwardResult = {
   status: "idle" | "verifying" | "verified" | "failed";
@@ -59,8 +65,8 @@ export async function startVerification(shopId: string): Promise<{ started: bool
     where: { id: found.step.id },
     data: { result: { status: "verifying", startedAt: new Date().toISOString(), callSid, carrier } as never },
   });
-  // Time the attempt out after 2 minutes.
-  await scheduleJob("/api/jobs/forwarding-timeout", { shopId }, 120);
+  // Time the attempt out if no forwarded call is detected in time.
+  await scheduleJob("/api/jobs/forwarding-timeout", { shopId }, 150);
   return { started: true };
 }
 

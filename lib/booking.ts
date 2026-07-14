@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "./db";
 import { isSlotAvailable, SLOT_MINUTES, type Busy } from "./scheduling";
+import { fuzzyMatchKey } from "./match-service";
 import type { ShopConfig } from "./schemas";
 
 // Server-side booking store. Switchboard owns availability: slots come from the
@@ -47,6 +48,12 @@ export async function createConfirmedBooking(args: {
   callId?: string;
 }): Promise<BookingOutcome> {
   const endUtc = new Date(args.startUtc.getTime() + SLOT_MINUTES * 60_000);
+  // Normalize the caller's free-text service to the shop's catalog name when it
+  // clearly matches one ("routine oil change for my BMW" → "Oil change"), so
+  // bookings, the dashboard, and revenue estimates all speak the same names.
+  // Ambiguous or novel requests keep the caller's own words.
+  const rawService = args.service?.trim() || null;
+  const service = rawService ? (fuzzyMatchKey(args.config.services.map((s) => s.service), rawService) ?? rawService) : null;
   return prisma.$transaction(async (tx) => {
     const rows = await tx.booking.findMany({
       where: { shopId: args.shopId, status: "confirmed", endUtc: { gt: args.now } },
@@ -61,7 +68,7 @@ export async function createConfirmedBooking(args: {
         shopId: args.shopId,
         startUtc: args.startUtc,
         endUtc,
-        service: args.service?.trim() || null,
+        service,
         customerName: args.customerName?.trim() || null,
         customerPhone: args.customerPhone?.trim() || null,
         callId: args.callId || null,

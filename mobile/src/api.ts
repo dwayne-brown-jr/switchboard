@@ -55,6 +55,7 @@ export interface HomeResponse {
   owner: { email: string; name: string | null };
   shop: HomeShop | null;
   stats: HomeStats | null;
+  planPrice: number | null;
 }
 export interface CallRow {
   id: string;

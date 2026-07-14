@@ -72,6 +72,21 @@ export default function Terms() {
         or unsolicited messages.
       </p>
 
+      <h2>Text messaging (SMS)</h2>
+      <p>
+        If you opt in, Switchboard sends you automated text alerts about your own business calls — <strong>booking
+        confirmations</strong> and <strong>emergency-call alerts</strong> — at the mobile number you provide (the
+        &quot;Switchboard Alerts&quot; program). You opt in during account setup by checking the SMS consent box; consent
+        is not a condition of purchase, and the box is unchecked by default.
+      </p>
+      <p>
+        Message frequency varies and depends on your call volume. <strong>Message and data rates may apply.</strong> Reply{" "}
+        <strong>STOP</strong> at any time to unsubscribe, or <strong>HELP</strong> for help; you can also manage texting from
+        your dashboard. For support, contact <a href="mailto:support@getswitchboardhq.com">support@getswitchboardhq.com</a>.
+        Mobile carriers are not liable for delayed or undelivered messages. We do not share your mobile number or SMS consent
+        with third parties or affiliates for their own marketing.
+      </p>
+
       <h2>Billing</h2>
       <p>
         Paid plans are billed monthly in advance through Stripe. You can cancel anytime from the billing portal in your

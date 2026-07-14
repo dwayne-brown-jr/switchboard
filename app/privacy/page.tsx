@@ -63,9 +63,11 @@ export default function Privacy() {
 
       <h2>Text messages (SMS)</h2>
       <p>
-        Switchboard may send SMS — for example, alerting you about an urgent call, or (where enabled and consented)
-        messaging a caller. Message and data rates may apply; recipients can reply STOP to opt out. Business texting is
-        subject to carrier registration (A2P 10DLC) and applicable consent laws.
+        If you opt in, Switchboard sends you automated text alerts about your business calls (booking confirmations and
+        emergency-call alerts) at the mobile number you provide. Message frequency varies; message and data rates may
+        apply. Reply <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for help. <strong>We do not share your
+        mobile number or SMS opt-in consent with any third parties or affiliates for their own marketing purposes.</strong>{" "}
+        Business texting is subject to carrier registration (A2P 10DLC) and applicable consent laws.
       </p>
 
       <h2>How we use information</h2>

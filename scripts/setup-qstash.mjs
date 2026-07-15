@@ -24,6 +24,7 @@ const DESIRED = [
   { cron: "0 3 * * *", path: "/api/jobs/reclaim-numbers" },
   { cron: "0 15 * * *", path: "/api/jobs/health-check" },
   { cron: "0 16 * * *", path: "/api/jobs/reminders" },
+  { cron: "0 8 * * *", path: "/api/jobs/usage-sweep" },
 ];
 
 const auth = { Authorization: `Bearer ${token}` };

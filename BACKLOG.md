@@ -54,7 +54,12 @@ Tracked so nothing gets lost. Ordered roughly by when it must be addressed.
       an HVAC prompt (`lib/demo.ts`).
 
 ## Owner mobile app (see separate plan)
-- [ ] Phase 0: authenticated API layer + push notification delivery.
-- [ ] Phase 1: Expo app — login, home, calls feed, push, pause.
-- [ ] Phase 2: appointments, recording playback, return-call.
+- [x] Phase 0: authenticated API layer + push notification delivery.
+- [x] Phase 1: Expo app — login, home, calls feed, push, pause.
+- [x] Phase 2: appointments, recording playback, return-call (call-back/text-back).
+- [x] Phase 2.5: act-on-call layer — deep-linked/actionable push (Call back button),
+      AI call summaries + transcripts in call detail, needs-attention follow-up queue
+      with mark-handled, owner block-off time + appointment cancel.
+      *Prod DB needs `prisma/prod-migrations/2026-07-14-call-followups.sql`.*
 - [ ] Phase 3: in-app VoIP (answer/return calls) with CallKit/ConnectionService.
+- [ ] Home-screen/lock-screen widgets + Live Activities (needs a dev build, not Expo Go).

@@ -139,6 +139,8 @@ export const callIngestSchema = z.object({
   hot_job: z.boolean().optional().default(false),
   recovered: z.boolean().optional().default(false),
   transcript_url: z.string().optional().nullable(),
+  summary: z.string().optional().nullable(),
+  transcript: z.string().optional().nullable(),
   flags: z.any().optional(),
 });
 

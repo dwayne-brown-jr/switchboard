@@ -31,6 +31,8 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
     hotJob: p.hot_job,
     recovered: p.recovered,
     transcriptUrl: p.transcript_url ?? null,
+    summary: p.summary ?? null,
+    transcript: p.transcript ?? null,
     flags: (p.flags as never) ?? undefined,
   };
 
@@ -63,11 +65,18 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
     }
 
     // Push to the owner's mobile app devices — both booked and emergency.
+    // callId/callerPhone let the app deep-link to the call and offer a
+    // call-back action straight from the notification.
     {
       const { pushToOwner } = await import("./push");
       const title = kind === "emergency" ? `🚨 Emergency — ${shop.businessName}` : `📅 New booking — ${shop.businessName}`;
       const fallback = kind === "emergency" ? "Urgent call flagged" : "New job booked";
-      await pushToOwner(shop.ownerId, { title, body: detail || fallback, data: { kind, shopId: shop.id } }).catch((e) => console.error("owner push failed", e));
+      await pushToOwner(shop.ownerId, {
+        title,
+        body: detail || fallback,
+        data: { kind, shopId: shop.id, callId: record.id, callerPhone: p.caller_phone ?? null },
+        categoryId: p.caller_phone ? "call" : undefined,
+      }).catch((e) => console.error("owner push failed", e));
     }
 
     // SMS — on BOOKINGS only. Emergencies are already texted by the agent's
@@ -126,6 +135,10 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
     hot_job: !!analysis.emergency,
     recovered: !!analysis.recovered,
     transcript_url: (c.recording_url as string) || null,
+    // Retell generates these on every analyzed call — free triage material for
+    // the owner app (2-line summary beats a 4-minute recording).
+    summary: (ca.call_summary as string) || null,
+    transcript: (c.transcript as string) || null,
     flags: analysis.flags ?? null,
   };
 }

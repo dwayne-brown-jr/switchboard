@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -20,10 +21,23 @@ import { StatusBar } from "expo-status-bar";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Notifications from "expo-notifications";
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from "expo-audio";
-import { api, clearToken, getToken, setToken, type Appointment, type CallRow, type HomeResponse } from "./src/api";
-import { registerForPush } from "./src/push";
+import { api, clearToken, getToken, needsAttention, setToken, type Appointment, type CallDetail, type CallRow, type HomeResponse } from "./src/api";
+import { CALLBACK_ACTION, registerForPush, registerNotificationActions, type PushData } from "./src/push";
 import { COLORS } from "./src/config";
+
+// --- Call back / text back ---------------------------------------------------
+function callBack(phone: string) {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  Linking.openURL(`tel:${phone}`).catch(() => {});
+}
+function textBack(phone: string) {
+  Haptics.selectionAsync().catch(() => {});
+  const body = encodeURIComponent("Hi, returning your call — how can we help?");
+  // iOS wants `&body=`, Android `?body=`.
+  Linking.openURL(Platform.OS === "ios" ? `sms:${phone}&body=${body}` : `sms:${phone}?body=${body}`).catch(() => {});
+}
 
 type Screen = "loading" | "login" | "app";
 type Tab = "home" | "calls" | "appointments";
@@ -168,12 +182,37 @@ function LoginScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
 // ---------------------------------------------------------------------------
 function Main({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("home");
+  // Deep link from a tapped push: jump to Calls and open that call's detail.
+  const [openCallId, setOpenCallId] = useState<string | null>(null);
+
+  useEffect(() => {
+    registerNotificationActions().catch(() => {});
+
+    const handle = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const data = (response.notification.request.content.data ?? {}) as PushData;
+      // "Call back" button on the notification → dial straight away.
+      if (response.actionIdentifier === CALLBACK_ACTION && data.callerPhone) {
+        callBack(data.callerPhone);
+      }
+      if (data.callId) {
+        setTab("calls");
+        setOpenCallId(data.callId);
+      }
+    };
+
+    // Cold start (app launched from the notification) + warm taps.
+    Notifications.getLastNotificationResponseAsync().then(handle).catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  }, []);
+
   return (
     <View style={styles.fill}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.fill} edges={["top"]}>
         {tab === "home" && <HomeTab onSignOut={onSignOut} />}
-        {tab === "calls" && <CallsTab />}
+        {tab === "calls" && <CallsTab openCallId={openCallId} onOpenConsumed={() => setOpenCallId(null)} />}
         {tab === "appointments" && <AppointmentsTab />}
       </SafeAreaView>
       <TabBar current={tab} onSelect={setTab} />
@@ -355,11 +394,12 @@ function HomeTab({ onSignOut }: { onSignOut: () => void }) {
 // ---------------------------------------------------------------------------
 // Calls
 // ---------------------------------------------------------------------------
-function CallsTab() {
+function CallsTab({ openCallId, onOpenConsumed }: { openCallId: string | null; onOpenConsumed: () => void }) {
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<CallRow | null>(null);
+  const [filter, setFilter] = useState<"all" | "attention">("all");
 
   const load = useCallback(async () => {
     try {
@@ -373,17 +413,56 @@ function CallsTab() {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  // Deep link from a push: open that call as soon as we can resolve it.
+  useEffect(() => {
+    if (!openCallId || loading) return;
+    onOpenConsumed();
+    const inList = calls.find((c) => c.id === openCallId);
+    if (inList) {
+      setSelected(inList);
+    } else {
+      api.callDetail(openCallId).then(({ call }) => setSelected(call)).catch(() => {});
+    }
+  }, [openCallId, loading, calls, onOpenConsumed]);
+
+  // Keep the list (and the open sheet) in sync when a call is marked handled.
+  const patchCall = useCallback((id: string, patch: Partial<CallRow>) => {
+    setCalls((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setSelected((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev));
+  }, []);
+
   if (loading) return <LoadingScreen />;
+
+  const attentionCount = calls.filter(needsAttention).length;
+  const shown = filter === "attention" ? calls.filter(needsAttention) : calls;
 
   return (
     <>
       <FlatList
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
-        data={calls}
+        data={shown}
         keyExtractor={(c) => c.id}
-        ListHeaderComponent={<LargeTitle title="Calls" />}
-        ListEmptyComponent={<EmptyState icon="call-outline" text="No calls yet. They'll appear here as they come in." />}
+        ListHeaderComponent={
+          <>
+            <LargeTitle title="Calls" />
+            <View style={styles.segmentWrap}>
+              <SegmentButton label="All" active={filter === "all"} onPress={() => setFilter("all")} />
+              <SegmentButton
+                label={`Needs attention${attentionCount ? ` (${attentionCount})` : ""}`}
+                active={filter === "attention"}
+                onPress={() => setFilter("attention")}
+              />
+            </View>
+          </>
+        }
+        ListEmptyComponent={
+          filter === "attention" ? (
+            <EmptyState icon="checkmark-done-outline" text="All caught up — nothing needs a follow-up." />
+          ) : (
+            <EmptyState icon="call-outline" text="No calls yet. They'll appear here as they come in." />
+          )
+        }
         refreshControl={<Refresh refreshing={refreshing} setRefreshing={setRefreshing} load={load} />}
         renderItem={({ item }) => (
           <CallItem
@@ -396,8 +475,22 @@ function CallsTab() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
-      <CallDetailModal call={selected} onClose={() => setSelected(null)} />
+      <CallDetailModal call={selected} onClose={() => setSelected(null)} onPatch={patchCall} />
     </>
+  );
+}
+
+function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+    >
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -414,9 +507,12 @@ function CallItem({ call, onPress }: { call: CallRow; onPress: () => void }) {
         <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={18} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowTitle}>{call.callerPhone ?? "Unknown caller"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {needsAttention(call) && <View style={styles.attentionDot} />}
+          <Text style={styles.rowTitle}>{call.callerPhone ?? "Unknown caller"}</Text>
+        </View>
         <Text style={styles.secondaryText} numberOfLines={1}>
-          {call.service ?? call.intent ?? "—"}
+          {call.summary ?? call.service ?? call.intent ?? "—"}
           {call.recordingUrl ? "  ·  recording" : ""}
         </Text>
       </View>
@@ -431,7 +527,45 @@ function CallItem({ call, onPress }: { call: CallRow; onPress: () => void }) {
   );
 }
 
-function CallDetailModal({ call, onClose }: { call: CallRow | null; onClose: () => void }) {
+function CallDetailModal({
+  call,
+  onClose,
+  onPatch,
+}: {
+  call: CallRow | null;
+  onClose: () => void;
+  onPatch: (id: string, patch: Partial<CallRow>) => void;
+}) {
+  const [detail, setDetail] = useState<CallDetail | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [marking, setMarking] = useState(false);
+
+  // The list payload omits the transcript — fetch the full record on open.
+  useEffect(() => {
+    setDetail(null);
+    setShowTranscript(false);
+    if (!call) return;
+    api.callDetail(call.id).then(({ call: d }) => setDetail(d)).catch(() => {});
+  }, [call?.id]);
+
+  async function toggleHandled() {
+    if (!call) return;
+    const next = !call.handledAt;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setMarking(true);
+    try {
+      const res = await api.markHandled(call.id, next);
+      onPatch(call.id, { handledAt: res.handledAt });
+    } catch {
+      /* leave state as-is */
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  const summary = detail?.summary ?? call?.summary ?? null;
+  const transcript = detail?.transcript ?? null;
+
   return (
     <Modal visible={!!call} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.fill, { backgroundColor: COLORS.bg }]}>
@@ -446,6 +580,27 @@ function CallDetailModal({ call, onClose }: { call: CallRow | null; onClose: () 
         </View>
         {call && (
           <ScrollView contentContainerStyle={{ padding: 20, gap: 10 }} showsVerticalScrollIndicator={false}>
+            {/* Act first: get the owner back to the caller in one tap. */}
+            {!!call.callerPhone && (
+              <View style={styles.actionRow}>
+                <Pressable style={[styles.primaryBtn, { flex: 1 }]} onPress={() => callBack(call.callerPhone!)}>
+                  <Ionicons name="call" size={18} color="#fff" />
+                  <Text style={styles.primaryBtnText}>Call back</Text>
+                </Pressable>
+                <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => textBack(call.callerPhone!)}>
+                  <Ionicons name="chatbubble" size={18} color={COLORS.brand} />
+                  <Text style={styles.secondaryBtnText}>Text back</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {!!summary && (
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryEyebrow}>WHAT HAPPENED</Text>
+                <Text style={styles.summaryText}>{summary}</Text>
+              </View>
+            )}
+
             <View style={styles.detailGroup}>
               <DetailRow label="Caller" value={call.callerPhone ?? "Unknown"} />
               <DetailRow label="When" value={new Date(call.timestamp).toLocaleString()} />
@@ -455,6 +610,31 @@ function CallDetailModal({ call, onClose }: { call: CallRow | null; onClose: () 
               {call.booked && <DetailRow label="Est. value" value={`$${call.estJobValue.toLocaleString()}`} />}
               <DetailRow label="Duration" value={`${Math.floor(call.durationSec / 60)}m ${call.durationSec % 60}s`} last />
             </View>
+
+            {needsAttention(call) ? (
+              <Pressable style={[styles.secondaryBtn, marking && styles.btnDisabled]} onPress={toggleHandled} disabled={marking}>
+                <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.brand} />
+                <Text style={styles.secondaryBtnText}>{marking ? "Saving…" : "Mark handled"}</Text>
+              </Pressable>
+            ) : call.handledAt ? (
+              <Pressable onPress={toggleHandled} disabled={marking} hitSlop={8}>
+                <Text style={[styles.secondaryText, { textAlign: "center" }]}>
+                  Handled ✓{"  "}
+                  <Text style={styles.linkText}>{marking ? "Saving…" : "Undo"}</Text>
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {!!transcript && (
+              <View style={styles.card}>
+                <Pressable style={styles.rowBetween} onPress={() => setShowTranscript((s) => !s)} hitSlop={8}>
+                  <Text style={styles.cardTitle}>Transcript</Text>
+                  <Ionicons name={showTranscript ? "chevron-up" : "chevron-down"} size={18} color={COLORS.muted} />
+                </Pressable>
+                {showTranscript && <Text style={[styles.secondaryText, { marginTop: 10 }]}>{transcript}</Text>}
+              </View>
+            )}
+
             {call.recordingUrl ? (
               <RecordingPlayer url={call.recordingUrl} />
             ) : (
@@ -512,6 +692,7 @@ function AppointmentsTab() {
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -525,40 +706,220 @@ function AppointmentsTab() {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  function actionsFor(appt: Appointment) {
+    const isBlock = appt.source === "owner_block";
+    Haptics.selectionAsync().catch(() => {});
+    Alert.alert(
+      isBlock ? "Blocked time" : appt.service ?? "Appointment",
+      `${new Date(appt.startUtc).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${appt.customerName ? ` · ${appt.customerName}` : ""}`,
+      [
+        ...(appt.customerPhone ? [{ text: "Call customer", onPress: () => callBack(appt.customerPhone!) }] : []),
+        {
+          text: isBlock ? "Remove block" : "Cancel appointment",
+          style: "destructive" as const,
+          onPress: async () => {
+            try {
+              await api.cancelAppointment(appt.id);
+              await load();
+            } catch (e: any) {
+              Alert.alert("Couldn't cancel", e.message ?? "Please try again.");
+            }
+          },
+        },
+        { text: "Close", style: "cancel" as const },
+      ],
+    );
+  }
+
   if (loading) return <LoadingScreen />;
 
   return (
-    <FlatList
-      contentContainerStyle={styles.body}
-      showsVerticalScrollIndicator={false}
-      data={appts}
-      keyExtractor={(a) => a.id}
-      ListHeaderComponent={<LargeTitle title="Appointments" />}
-      ListEmptyComponent={<EmptyState icon="calendar-outline" text="No upcoming appointments. New bookings land here." />}
-      refreshControl={<Refresh refreshing={refreshing} setRefreshing={setRefreshing} load={load} />}
-      renderItem={({ item }) => <AppointmentItem appt={item} />}
-      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-    />
+    <>
+      <FlatList
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+        data={appts}
+        keyExtractor={(a) => a.id}
+        ListHeaderComponent={
+          <LargeTitle
+            title="Appointments"
+            right={
+              <Pressable onPress={() => setBlocking(true)} hitSlop={8} style={styles.blockBtn}>
+                <Ionicons name="remove-circle-outline" size={16} color={COLORS.brand} />
+                <Text style={styles.linkText}>Block time</Text>
+              </Pressable>
+            }
+          />
+        }
+        ListEmptyComponent={<EmptyState icon="calendar-outline" text="No upcoming appointments. New bookings land here." />}
+        refreshControl={<Refresh refreshing={refreshing} setRefreshing={setRefreshing} load={load} />}
+        renderItem={({ item }) => <AppointmentItem appt={item} onPress={() => actionsFor(item)} />}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      />
+      <BlockTimeSheet
+        visible={blocking}
+        onClose={() => setBlocking(false)}
+        onCreated={() => {
+          setBlocking(false);
+          load();
+        }}
+      />
+    </>
   );
 }
 
-function AppointmentItem({ appt }: { appt: Appointment }) {
+function AppointmentItem({ appt, onPress }: { appt: Appointment; onPress: () => void }) {
   const start = new Date(appt.startUtc);
+  const isBlock = appt.source === "owner_block";
   return (
-    <View style={styles.row}>
-      <View style={styles.apptDate}>
-        <Text style={styles.apptMonth}>{start.toLocaleDateString([], { month: "short" }).toUpperCase()}</Text>
-        <Text style={styles.apptDay}>{start.getDate()}</Text>
+    <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
+      <View style={[styles.apptDate, isBlock && { backgroundColor: COLORS.bg }]}>
+        {isBlock ? (
+          <Ionicons name="lock-closed" size={20} color={COLORS.muted} />
+        ) : (
+          <>
+            <Text style={styles.apptMonth}>{start.toLocaleDateString([], { month: "short" }).toUpperCase()}</Text>
+            <Text style={styles.apptDay}>{start.getDate()}</Text>
+          </>
+        )}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowTitle}>{appt.service ?? "Appointment"}</Text>
+        <Text style={[styles.rowTitle, isBlock && { color: COLORS.secondary }]}>{isBlock ? appt.service ?? "Blocked off" : appt.service ?? "Appointment"}</Text>
         <Text style={styles.secondaryText}>
+          {isBlock ? `${start.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} · ` : ""}
           {start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          {" – "}
+          {new Date(appt.endUtc).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
           {appt.customerName ? `  ·  ${appt.customerName}` : ""}
         </Text>
         {!!appt.customerPhone && <Text style={styles.timeText}>{appt.customerPhone}</Text>}
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={16} color={COLORS.faint} />
+    </Pressable>
+  );
+}
+
+// Block off time without any native picker dependency: day chips + start-time
+// chips + duration chips. Times are built in the device's timezone (the owner
+// carries the shop's timezone in their pocket).
+function BlockTimeSheet({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated: () => void }) {
+  const [dayOffset, setDayOffset] = useState(0);
+  const [startHour, setStartHour] = useState(12);
+  const [durationH, setDurationH] = useState(2);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const hours = Array.from({ length: 13 }, (_, i) => i + 7); // 7am–7pm
+  const durations = [
+    { label: "1 hr", h: 1 },
+    { label: "2 hrs", h: 2 },
+    { label: "Half day", h: 4 },
+    { label: "Rest of day", h: -1 },
+  ];
+
+  async function save() {
+    setError("");
+    const start = new Date();
+    start.setDate(start.getDate() + dayOffset);
+    start.setHours(startHour, 0, 0, 0);
+    const end = new Date(start);
+    if (durationH === -1) {
+      end.setHours(23, 59, 0, 0);
+    } else {
+      end.setHours(start.getHours() + durationH);
+    }
+    if (end <= new Date()) {
+      setError("That time is already past — pick a later start.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.createBlock(start.toISOString(), end.toISOString());
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onCreated();
+    } catch (e: any) {
+      setError(e.message ?? "Couldn't block that time.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.fill, { backgroundColor: COLORS.bg }]}>
+        <View style={styles.sheetGrabberWrap}>
+          <View style={styles.sheetGrabber} />
+        </View>
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Block off time</Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={styles.linkText}>Cancel</Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 18 }} showsVerticalScrollIndicator={false}>
+          <Text style={styles.secondaryText}>Your receptionist will stop offering these times to callers.</Text>
+
+          <View>
+            <Text style={styles.fieldLabel}>Day</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {days.map((d, i) => (
+                <Chip
+                  key={i}
+                  label={i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}
+                  active={dayOffset === i}
+                  onPress={() => setDayOffset(i)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          <View>
+            <Text style={styles.fieldLabel}>Starting at</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {hours.map((h) => (
+                <Chip
+                  key={h}
+                  label={new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: "numeric" })}
+                  active={startHour === h}
+                  onPress={() => setStartHour(h)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+
+          <View>
+            <Text style={styles.fieldLabel}>For</Text>
+            <View style={[styles.chipRow, { flexWrap: "wrap" }]}>
+              {durations.map((d) => (
+                <Chip key={d.label} label={d.label} active={durationH === d.h} onPress={() => setDurationH(d.h)} />
+              ))}
+            </View>
+          </View>
+
+          {!!error && <Text style={styles.error}>{error}</Text>}
+          <PrimaryButton label={busy ? "Blocking…" : "Block this time"} onPress={save} disabled={busy} />
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      style={[styles.chip, active && styles.chipActive]}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -687,7 +1048,31 @@ const styles = StyleSheet.create({
   // Buttons
   primaryBtn: { backgroundColor: COLORS.brand, borderRadius: 12, paddingVertical: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  secondaryBtn: { backgroundColor: COLORS.brandTint, borderRadius: 12, paddingVertical: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  secondaryBtnText: { color: COLORS.brand, fontWeight: "700", fontSize: 16 },
   btnDisabled: { opacity: 0.5 },
+  actionRow: { flexDirection: "row", gap: 10 },
+
+  // Needs-attention
+  attentionDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.amber },
+  segmentWrap: { flexDirection: "row", gap: 8, marginBottom: 4 },
+  segmentBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.card, ...CARD_SHADOW },
+  segmentBtnActive: { backgroundColor: COLORS.brand },
+  segmentText: { fontSize: 13, fontWeight: "600", color: COLORS.secondary },
+  segmentTextActive: { color: "#fff" },
+
+  // Summary card
+  summaryCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, gap: 6, ...CARD_SHADOW },
+  summaryEyebrow: { color: COLORS.muted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2 },
+  summaryText: { color: COLORS.text, fontSize: 15, lineHeight: 21 },
+
+  // Block-time sheet
+  blockBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 },
+  chipRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  chip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  chipActive: { backgroundColor: COLORS.brand, borderColor: COLORS.brand },
+  chipText: { fontSize: 13.5, fontWeight: "600", color: COLORS.secondary },
+  chipTextActive: { color: "#fff" },
 
   // Cards / rows
   card: { backgroundColor: COLORS.card, borderRadius: 18, padding: 18, ...CARD_SHADOW },

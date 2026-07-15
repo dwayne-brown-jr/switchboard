@@ -11,13 +11,16 @@ export interface PushMessage {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  /** Expo notification category — enables action buttons the app registered
+   *  under this id (e.g. "call" → a Call back button on the notification). */
+  categoryId?: string;
 }
 
 /** Send an Expo push to a set of tokens. Silently drops non-Expo tokens. */
 export async function sendExpoPush(tokens: string[], msg: PushMessage): Promise<void> {
   const valid = tokens.filter((t) => t && t.startsWith("ExponentPushToken"));
   if (valid.length === 0) return;
-  const messages = valid.map((to) => ({ to, title: msg.title, body: msg.body, data: msg.data, sound: "default" }));
+  const messages = valid.map((to) => ({ to, title: msg.title, body: msg.body, data: msg.data, sound: "default", categoryId: msg.categoryId }));
   try {
     await fetch(EXPO_PUSH_URL, {
       method: "POST",

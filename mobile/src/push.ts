@@ -14,6 +14,23 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Notification data the server attaches for deep-linking (lib/push.ts). */
+export interface PushData {
+  kind?: string;
+  callId?: string;
+  callerPhone?: string | null;
+}
+
+export const CALLBACK_ACTION = "callback";
+
+/** Register the "call" category so emergency/booking pushes with a caller
+ *  number get a Call back button right on the notification. */
+export async function registerNotificationActions(): Promise<void> {
+  await Notifications.setNotificationCategoryAsync("call", [
+    { identifier: CALLBACK_ACTION, buttonTitle: "Call back", options: { opensAppToForeground: true } },
+  ]).catch(() => {});
+}
+
 /** Ask for permission and return this device's Expo push token (or null). */
 export async function registerForPush(): Promise<string | null> {
   if (!Device.isDevice) return null; // push tokens aren't issued on simulators

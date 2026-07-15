@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Switchboard — The Missed Call Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#141414;
+  --paper:#f4f1ea;
+  --panel:#1c1c1c;
+  --panel2:#242424;
+  --orange:#ff5c1f;
+  --orange-dim:#c8481a;
+  --green:#3ddc84;
+  --red:#ff4747;
+  --amber:#ffb020;
+  --line:#3a3a3a;
+  --mut:#9a958a;
+  --mut2:#6f6b62;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--panel);
+  color:var(--paper);
+  font-family:'Barlow',sans-serif;
+  font-size:16px;
+  line-height:1.5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 4px);
+}
+.wrap{max-width:520px;margin:0 auto;padding:0 18px 80px}
+h1,h2,h3,.disp{font-family:'Barlow Condensed',sans-serif;letter-spacing:.01em}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* ---------- header ---------- */
+header{padding:26px 0 8px;border-bottom:3px solid var(--orange)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .dot{width:12px;height:12px;background:var(--orange);border-radius:2px;box-shadow:0 0 12px var(--orange)}
+.brand span{font-family:'Barlow Condensed';font-weight:800;font-size:22px;text-transform:uppercase;letter-spacing:.14em}
+.tagline{font-family:'IBM Plex Mono';font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.18em;margin:6px 0 14px}
+
+/* ---------- setup ---------- */
+.setup{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px;margin:20px 0 8px}
+.setup label{display:block;font-family:'IBM Plex Mono';font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--mut);margin:10px 0 5px}
+.setup input[type=text]{
+  width:100%;background:#111;border:1px solid var(--line);border-radius:6px;
+  color:var(--paper);font-family:'Barlow Condensed';font-weight:700;font-size:22px;padding:8px 12px;
+}
+.setup input[type=text]:focus{outline:none;border-color:var(--orange)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  border:1px solid var(--line);background:#111;color:var(--mut);border-radius:99px;
+  padding:7px 13px;font-family:'IBM Plex Mono';font-size:11.5px;cursor:pointer;transition:.15s;
+  text-transform:uppercase;letter-spacing:.05em
+}
+.chip.on{background:var(--orange);border-color:var(--orange);color:#111;font-weight:600}
+
+/* ---------- section scaffolding ---------- */
+.act{margin-top:44px}
+.kicker{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.kicker .n{
+  font-family:'Barlow Condensed';font-weight:800;font-size:14px;color:#111;background:var(--orange);
+  width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px
+}
+.kicker .t{font-family:'IBM Plex Mono';font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--mut)}
+.act h2{font-size:34px;font-weight:800;text-transform:uppercase;line-height:1.02;margin-bottom:6px}
+.act .sub{color:var(--mut);font-size:15px;margin-bottom:18px;max-width:44ch}
+.hl{color:var(--orange)}
+
+/* ---------- phone-day sim ---------- */
+.simcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.modebar{display:flex}
+.modebar button{
+  flex:1;padding:13px 6px;font-family:'Barlow Condensed';font-weight:700;font-size:17px;
+  text-transform:uppercase;letter-spacing:.06em;background:#111;color:var(--mut);border:none;cursor:pointer;transition:.2s
+}
+.modebar button.on-today{background:var(--red);color:#fff}
+.modebar button.on-sb{background:var(--green);color:#0c2417}
+.simhead{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 4px}
+.simhead .d{font-family:'IBM Plex Mono';font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.12em}
+.calls{padding:8px 16px 6px;min-height:396px}
+.call{
+  display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px dashed #333;
+  opacity:0;transform:translateX(-8px);transition:opacity .35s,transform .35s
+}
+.call.show{opacity:1;transform:none}
+.call .time{font-family:'IBM Plex Mono';font-size:11px;color:var(--mut2);width:56px;flex:none}
+.call .who{flex:1;min-width:0}
+.call .who .name{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call .who .need{font-size:12px;color:var(--mut)}
+.badge{
+  flex:none;font-family:'IBM Plex Mono';font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.06em;padding:4px 8px;border-radius:4px
+}
+.b-ans{background:rgba(61,220,132,.14);color:var(--green);border:1px solid rgba(61,220,132,.35)}
+.b-miss{background:rgba(255,71,71,.12);color:var(--red);border:1px solid rgba(255,71,71,.35)}
+.b-vm{background:rgba(255,176,32,.12);color:var(--amber);border:1px solid rgba(255,176,32,.35)}
+.b-book{background:var(--green);color:#0c2417;border:1px solid var(--green)}
+.b-after{background:rgba(61,220,132,.14);color:var(--green);border:1px solid rgba(61,220,132,.35)}
+.tally{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--line)}
+.tally .cell{padding:13px 8px;text-align:center;border-right:1px solid var(--line)}
+.tally .cell:last-child{border-right:none}
+.tally .v{font-family:'Barlow Condensed';font-weight:800;font-size:30px;line-height:1}
+.tally .k{font-family:'IBM Plex Mono';font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);margin-top:3px}
+.lostbar{padding:14px 16px;border-top:1px solid var(--line);background:#161616}
+.lostbar .lbl{font-family:'IBM Plex Mono';font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--mut)}
+.lostbar .amt{font-family:'Barlow Condensed';font-weight:800;font-size:44px;line-height:1.05}
+.amt.bad{color:var(--red)}
+.amt.good{color:var(--green)}
+.replay{margin-top:10px;width:100%;padding:12px;background:transparent;border:1px solid var(--line);color:var(--mut);
+  border-radius:8px;font-family:'IBM Plex Mono';font-size:12px;text-transform:uppercase;letter-spacing:.14em;cursor:pointer}
+.replay:active{border-color:var(--orange);color:var(--orange)}
+.simnote{font-size:12px;color:var(--mut2);margin-top:10px;line-height:1.45}
+
+/* ---------- calculator ---------- */
+.calc{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:18px 16px}
+.slider-row{margin-bottom:18px}
+.slider-row .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.slider-row .lab{font-size:14px;font-weight:500}
+.slider-row .val{font-family:'Barlow Condensed';font-weight:800;font-size:24px;color:var(--orange)}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;background:#3a3a3a;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;background:var(--orange);border:3px solid #111;cursor:pointer;box-shadow:0 0 0 1px var(--orange)}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--orange);border:3px solid #111;cursor:pointer}
+.result{margin-top:6px;border-top:2px solid var(--orange);padding-top:14px}
+.res-line{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed #333}
+.res-line .k{font-size:13.5px;color:var(--mut)}
+.res-line .v{font-family:'IBM Plex Mono';font-weight:600;font-size:15px}
+.bigres{margin-top:14px;background:#111;border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center}
+.bigres .k{font-family:'IBM Plex Mono';font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--mut)}
+.bigres .v{font-family:'Barlow Condensed';font-weight:800;font-size:52px;line-height:1.05;color:var(--red)}
+.bigres .vs{font-size:13px;color:var(--mut);margin-top:6px}
+.bigres .vs b{color:var(--green)}
+.payback{margin-top:12px;text-align:center;font-size:14px;color:var(--paper);background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.3);border-radius:8px;padding:11px}
+.payback b{color:var(--green)}
+
+/* ---------- proof wall ---------- */
+.proof{display:flex;flex-direction:column;gap:10px}
+.pcard{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:8px;padding:14px 15px}
+.pcard .co{font-family:'Barlow Condensed';font-weight:800;font-size:19px;text-transform:uppercase;letter-spacing:.03em}
+.pcard .fact{font-size:13.5px;color:var(--mut);margin-top:3px;line-height:1.45}
+.pcard .fact b{color:var(--paper)}
+.punch{margin-top:16px;background:var(--orange);color:#111;border-radius:10px;padding:18px 16px}
+.punch .disp{font-weight:800;font-size:24px;text-transform:uppercase;line-height:1.1}
+.punch p{font-size:14px;font-weight:500;margin-top:6px}
+
+/* ---------- before / after ---------- */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bacol{border-radius:10px;padding:14px 13px;border:1px solid var(--line)}
+.bacol.today{background:#1a1414}
+.bacol.sb{background:#12201a;border-color:rgba(61,220,132,.35)}
+.bacol h3{font-size:17px;text-transform:uppercase;font-weight:800;margin-bottom:9px}
+.bacol.today h3{color:var(--red)}
+.bacol.sb h3{color:var(--green)}
+.bacol ul{list-style:none}
+.bacol li{font-size:12.5px;padding:6px 0;border-bottom:1px dashed #333;color:var(--mut);line-height:1.4}
+.bacol li b{color:var(--paper);font-weight:600}
+
+/* ---------- close ---------- */
+.close{margin-top:44px;background:var(--panel2);border:2px solid var(--orange);border-radius:14px;padding:24px 18px;text-align:center}
+.close .disp{font-weight:800;font-size:30px;text-transform:uppercase;line-height:1.05}
+.close .demo-num{
+  display:block;margin:16px auto 4px;font-family:'IBM Plex Mono';font-weight:600;font-size:24px;color:var(--orange);
+  text-decoration:none;border:1px dashed var(--orange);border-radius:8px;padding:12px;max-width:300px
+}
+.close .hint{font-family:'IBM Plex Mono';font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--mut);margin-top:8px}
+.close .terms{margin-top:16px;font-size:14px;color:var(--paper)}
+.close .terms b{color:var(--green)}
+.foot{margin-top:26px;text-align:center;font-family:'IBM Plex Mono';font-size:10px;color:var(--mut2);text-transform:uppercase;letter-spacing:.14em;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand"><div class="dot"></div><span>Switchboard</span></div>
+  <div class="tagline">The missed-call demo // 2-minute version</div>
+</header>
+
+<!-- SETUP -->
+<div class="setup">
+  <label>This demo is for</label>
+  <input type="text" id="shopName" value="Your Shop" maxlength="28">
+  <label>Business type</label>
+  <div class="chips" id="vertChips">
+    <button class="chip on" data-v="auto" data-ticket="400">Auto Repair</button>
+    <button class="chip" data-v="detail" data-ticket="250">Detailing</button>
+    <button class="chip" data-v="hvac" data-ticket="600">HVAC</button>
+    <button class="chip" data-v="plumb" data-ticket="500">Plumbing</button>
+    <button class="chip" data-v="clean" data-ticket="220">Cleaning</button>
+  </div>
+</div>
+
+<!-- ACT 1 -->
+<section class="act">
+  <div class="kicker"><div class="n">1</div><div class="t">Where you are</div></div>
+  <h2>A normal Tuesday<br>on <span class="hl" id="shopNameEcho">your shop</span>'s phone</h2>
+  <p class="sub">Same phone. Same customers. Flip the switch and watch what changes.</p>
+
+  <div class="simcard">
+    <div class="modebar">
+      <button id="btnToday" class="on-today">Today</button>
+      <button id="btnSB">With Switchboard</button>
+    </div>
+    <div class="simhead">
+      <div class="d" id="simModeLabel">Your phone — as it works now</div>
+      <div class="d mono" id="simClock">8:00 AM</div>
+    </div>
+    <div class="calls" id="callFeed"></div>
+    <div class="tally">
+      <div class="cell"><div class="v" id="tAns" style="color:var(--green)">0</div><div class="k">Answered</div></div>
+      <div class="cell"><div class="v" id="tMiss" style="color:var(--red)">0</div><div class="k">Missed</div></div>
+      <div class="cell"><div class="v" id="tBook" style="color:var(--paper)">0</div><div class="k">Jobs booked</div></div>
+    </div>
+    <div class="lostbar">
+      <div class="lbl" id="lostLbl">Revenue that walked to a competitor</div>
+      <div class="amt bad" id="lostAmt">$0</div>
+    </div>
+  </div>
+  <button class="replay" id="replayBtn">↻ Replay the day</button>
+  <p class="simnote">Illustration using typical patterns: shops reach the phone roughly 6 of every 10 rings during work hours, and most callers who hit voicemail don't leave one — they dial the next result on Google. Your real numbers go in the calculator below.</p>
+</section>
+
+<!-- ACT 2 -->
+<section class="act">
+  <div class="kicker"><div class="n">2</div><div class="t">What it costs you</div></div>
+  <h2>Run <span class="hl">your</span> numbers</h2>
+  <p class="sub">No inflated stats — set these to whatever you believe is true for your shop. Even the low end is expensive.</p>
+
+  <div class="calc">
+    <div class="slider-row">
+      <div class="top"><span class="lab">Calls you miss per day</span><span class="val" id="vMiss">3</span></div>
+      <input type="range" id="sMiss" min="1" max="12" step="1" value="3">
+    </div>
+    <div class="slider-row">
+      <div class="top"><span class="lab">% of those that were real jobs</span><span class="val" id="vConv">30%</span></div>
+      <input type="range" id="sConv" min="10" max="60" step="5" value="30">
+    </div>
+    <div class="slider-row">
+      <div class="top"><span class="lab">Your average ticket</span><span class="val" id="vTicket">$400</span></div>
+      <input type="range" id="sTicket" min="100" max="1500" step="50" value="400">
+    </div>
+
+    <div class="result">
+      <div class="res-line"><span class="k">Lost jobs per month (26 work days)</span><span class="v" id="rJobs">—</span></div>
+      <div class="res-line"><span class="k">Lost revenue per month</span><span class="v" id="rMonth" style="color:var(--red)">—</span></div>
+      <div class="res-line"><span class="k">Lost revenue per year</span><span class="v" id="rYear" style="color:var(--red)">—</span></div>
+    </div>
+
+    <div class="bigres">
+      <div class="k">Walking out the door every month</div>
+      <div class="v" id="bigLost">—</div>
+      <div class="vs">vs. Switchboard at <b>$149/mo</b> — flat, no contract</div>
+    </div>
+    <div class="payback" id="payback">—</div>
+  </div>
+</section>
+
+<!-- ACT 3 -->
+<section class="act">
+  <div class="kicker"><div class="n">3</div><div class="t">Why now</div></div>
+  <h2>The big money already<br>made this bet</h2>
+  <p class="sub">AI phone answering isn't an experiment anymore — it's where the service industry's biggest players are putting real capital. They're just selling it to the big shops first.</p>
+
+  <div class="proof">
+    <div class="pcard">
+      <div class="co">Avoca</div>
+      <div class="fact">AI call handling for HVAC &amp; home services — raised <b>~$125M at a ~$1B valuation</b>. Sold to large shops at roughly <b>$1,000–3,500/mo</b>, sales-team only.</div>
+    </div>
+    <div class="pcard">
+      <div class="co">ServiceTitan</div>
+      <div class="fact">The dominant software platform for the trades built its own <b>AI contact center</b> — priced per call, aimed at multi-truck operations.</div>
+    </div>
+    <div class="pcard">
+      <div class="co">Jobber &amp; Housecall Pro</div>
+      <div class="fact">Both field-service platforms now <b>bundle an AI receptionist</b> into their subscriptions — but only for businesses already running their software.</div>
+    </div>
+    <div class="pcard">
+      <div class="co">AutoLeap &amp; Numa</div>
+      <div class="fact">Auto-repair software vendors launched AI phone products in 2026; Numa's AI answers for <b>car dealerships</b> nationwide, marketing itself on the revenue dealers lose to missed calls.</div>
+    </div>
+  </div>
+
+  <div class="punch">
+    <div class="disp">Every one of them skipped the independent shop.</div>
+    <p>Too small for a sales team, they figured. Switchboard is the same class of tech — self-serve, transparent pricing, built for a shop your size. $149. You can hear it before you pay a dime.</p>
+  </div>
+</section>
+
+<!-- ACT 4 -->
+<section class="act">
+  <div class="kicker"><div class="n">4</div><div class="t">Where you could be</div></div>
+  <h2>Same shop.<br>Different phone.</h2>
+  <p class="sub" id="baSub">Nothing about how you work changes — only what happens when you can't pick up.</p>
+
+  <div class="ba">
+    <div class="bacol today">
+      <h3>Today</h3>
+      <ul>
+        <li><b>Hands full</b> → call rings out</li>
+        <li><b>After 5pm / weekends</b> → voicemail</li>
+        <li>Most callers <b>don't leave a message</b> — they call the next shop</li>
+        <li>You call back at lunch → <b>already booked elsewhere</b></li>
+        <li>You have <b>no idea</b> how much this costs you</li>
+      </ul>
+    </div>
+    <div class="bacol sb">
+      <h3>With Switchboard</h3>
+      <ul>
+        <li>Answered in <b>~1 ring, 24/7</b></li>
+        <li>Knows <b>your services, prices &amp; hours</b></li>
+        <li><b>Books the job</b> straight onto your calendar</li>
+        <li><b>Texts you a summary</b> of every call</li>
+        <li>Every change passes a <b>quality check</b> before going live — it never freelances</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSE -->
+<div class="close">
+  <div class="disp">Don't take my word for it.<br><span class="hl">Call it right now.</span></div>
+  <a class="demo-num" href="tel:+17605550123" id="demoNum">(760) 555-0123</a>
+  <div class="hint">Live demo line — ask it for a quote like a real customer</div>
+  <div class="terms">$149/mo flat · No setup fee · No contract · <b>Hear your shop's own version before you pay</b></div>
+</div>
+
+<div class="foot">
+  Built &amp; supported locally · Dwayne — Vista, CA<br>
+  Figures shown are illustrative estimates, not guarantees
+</div>
+
+</div>
+
+<script>
+/* ---------- state ---------- */
+var mode = 'today';
+var vertical = 'auto';
+var timers = [];
+
+var CALLSETS = {
+  auto: [
+    {t:'8:12a', n:'Mike R.', need:'Check-engine light — needs it today', v:420},
+    {t:'9:05a', n:'Sarah L.', need:'Brake quote, 2019 RAV4', v:520},
+    {t:'9:48a', n:'Fleet acct', need:'3 work trucks, service schedule', v:1100},
+    {t:'10:30a', n:'Tom B.', need:'Oil change + tire rotation', v:120},
+    {t:'11:15a', n:'Dana W.', need:'AC blowing warm', v:480},
+    {t:'12:40p', n:'Chris P.', need:'Car won’t start — stranded', v:390},
+    {t:'2:05p', n:'Maria G.', need:'Smog check appointment', v:70},
+    {t:'3:20p', n:'Kevin H.', need:'Alternator quote', v:610},
+    {t:'6:45p', n:'Lisa M.', need:'After hours — noise when braking', v:450},
+    {t:'8:10p', n:'Raj P.', need:'After hours — pre-purchase inspection', v:180}
+  ],
+  detail: [
+    {t:'8:20a', n:'Amber K.', need:'Full interior — dog hair', v:220},
+    {t:'9:10a', n:'Josh T.', need:'Ceramic coating quote, Model Y', v:1200},
+    {t:'10:05a', n:'Realtor', need:'Client car before listing photos', v:180},
+    {t:'11:30a', n:'Gina F.', need:'Same-day detail before a trip', v:250},
+    {t:'12:15p', n:'Dealer lot', need:'4 units this week', v:700},
+    {t:'1:40p', n:'Paul D.', need:'Headlight restoration', v:130},
+    {t:'3:00p', n:'Nicole S.', need:'Mobile detail at office park', v:240},
+    {t:'4:25p', n:'Brett W.', need:'Boat detail quote', v:450},
+    {t:'7:15p', n:'Elena V.', need:'After hours — spill emergency', v:200},
+    {t:'8:40p', n:'Sam O.', need:'After hours — weekend booking', v:260}
+  ],
+  hvac: [
+    {t:'7:55a', n:'Walters res.', need:'AC died overnight — heat wave', v:850},
+    {t:'8:40a', n:'Property mgr', need:'2 units out at complex', v:1400},
+    {t:'9:30a', n:'Diane C.', need:'Maintenance plan question', v:180},
+    {t:'10:45a', n:'Ortiz res.', need:'Weird noise from furnace', v:420},
+    {t:'12:10p', n:'Café owner', need:'Walk-in cooler warm', v:900},
+    {t:'1:35p', n:'Ken A.', need:'Quote: mini-split install', v:3200},
+    {t:'3:15p', n:'Brooke N.', need:'Thermostat replacement', v:260},
+    {t:'5:50p', n:'Patel res.', need:'After hours — no AC, elderly parent', v:750},
+    {t:'8:05p', n:'Vic S.', need:'After hours — booking tune-up', v:190},
+    {t:'9:30p', n:'Reyes res.', need:'After hours — AC quote', v:680}
+  ],
+  plumb: [
+    {t:'7:45a', n:'Nguyen res.', need:'Water heater leaking', v:1400},
+    {t:'8:50a', n:'Landlord', need:'Tenant clogged drain', v:280},
+    {t:'9:40a', n:'Rosa M.', need:'Toilet running — quote', v:220},
+    {t:'11:00a', n:'Restaurant', need:'Grease trap backing up', v:650},
+    {t:'12:30p', n:'Jeff K.', need:'Garbage disposal install', v:310},
+    {t:'2:10p', n:'HOA board', need:'Repipe bid for 6 units', v:4800},
+    {t:'3:45p', n:'Tina R.', need:'Low pressure whole house', v:390},
+    {t:'6:20p', n:'Adams res.', need:'After hours — slab leak?', v:1800},
+    {t:'9:15p', n:'Mel D.', need:'After hours — book faucet swap', v:240},
+    {t:'11:40p', n:'Cortez res.', need:'Late night — water everywhere', v:950}
+  ],
+  clean: [
+    {t:'8:05a', n:'Kim L.', need:'Move-out clean Friday', v:380},
+    {t:'9:00a', n:'Airbnb host', need:'Turnover clean, recurring', v:180},
+    {t:'9:55a', n:'Office mgr', need:'Weekly commercial quote', v:600},
+    {t:'11:20a', n:'Priya S.', need:'Deep clean before in-laws', v:320},
+    {t:'12:45p', n:'Realtor', need:'Listing clean — needs it tomorrow', v:280},
+    {t:'2:00p', n:'Grant W.', need:'Recurring bi-weekly', v:170},
+    {t:'3:30p', n:'Dr. office', need:'Evening janitorial bid', v:750},
+    {t:'5:40p', n:'Ana T.', need:'After hours — Saturday availability', v:220},
+    {t:'7:25p', n:'Beth C.', need:'After hours — post-party rescue', v:260},
+    {t:'9:00p', n:'Leo M.', need:'After hours — move-in quote', v:340}
+  ]
+};
+
+/* which calls the shop answers in "today" mode (indexes) — misses cluster at busy & after-hours times */
+var ANSWERED_TODAY = {
+  auto:[1,3,6,7], detail:[0,3,5,6], hvac:[1,2,4,6], plumb:[1,2,4,6], clean:[0,2,3,5]
+};
+/* of missed calls, which leave a voicemail that later converts (1 per day, being generous) */
+var VM_SAVED = { auto:[4], detail:[7], hvac:[3], plumb:[3], clean:[4] };
+
+var money = function(n){ return '$' + Math.round(n).toLocaleString(); };
+
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+
+function runSim(){
+  clearTimers();
+  var feed = document.getElementById('callFeed');
+  feed.innerHTML = '';
+  var calls = CALLSETS[vertical];
+  var answered = ANSWERED_TODAY[vertical];
+  var saved = VM_SAVED[vertical];
+  var tAns=0, tMiss=0, tBook=0, lost=0;
+  var eAns=document.getElementById('tAns'), eMiss=document.getElementById('tMiss'),
+      eBook=document.getElementById('tBook'), eLost=document.getElementById('lostAmt'),
+      eClock=document.getElementById('simClock'), eLbl=document.getElementById('lostLbl');
+
+  eAns.textContent='0'; eMiss.textContent='0'; eBook.textContent='0';
+  eLost.textContent='$0';
+  if(mode==='today'){
+    eLost.className='amt bad';
+    eLbl.textContent='Revenue that walked to a competitor';
+    document.getElementById('simModeLabel').textContent='Your phone — as it works now';
+  } else {
+    eLost.className='amt good';
+    eLbl.textContent='Revenue captured that used to walk';
+    document.getElementById('simModeLabel').textContent='Your phone — answered by Switchboard';
+  }
+
+  calls.forEach(function(c, i){
+    timers.push(setTimeout(function(){
+      eClock.textContent = c.t.toUpperCase();
+      var row = document.createElement('div');
+      row.className='call';
+      var badge;
+      if(mode==='sb'){
+        tAns++; tBook++;
+        var isAfter = /p$/.test(c.t) && parseInt(c.t) >= 5 || /[89]:\d+p|1\d:\d+p/.test(c.t);
+        badge = '<span class="badge b-book">Booked</span>';
+        if(answered.indexOf(i)===-1){ lost += c.v; } /* count what USED to walk */
+      } else {
+        if(answered.indexOf(i)>-1){
+          tAns++; tBook++;
+          badge='<span class="badge b-ans">Answered</span>';
+        } else if(saved.indexOf(i)>-1){
+          tMiss++; tBook++;
+          badge='<span class="badge b-vm">VM → callback</span>';
+        } else {
+          tMiss++; lost += c.v;
+          badge='<span class="badge b-miss">Missed → gone</span>';
+        }
+      }
+      row.innerHTML = '<div class="time mono">'+c.t+'</div>'+
+        '<div class="who"><div class="name">'+c.n+'</div><div class="need">'+c.need+'</div></div>'+badge;
+      feed.appendChild(row);
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ row.classList.add('show'); }); });
+      eAns.textContent=tAns; eMiss.textContent=tMiss; eBook.textContent=tBook;
+      eLost.textContent = (mode==='sb'?'+':'−') + money(lost).slice(0);
+      eLost.textContent = (mode==='sb'?'+ ':'− ') + money(lost);
+      feed.parentElement.scrollTop = feed.parentElement.scrollHeight;
+    }, 550*i + 200));
+  });
+}
+
+document.getElementById('btnToday').addEventListener('click', function(){
+  mode='today';
+  this.className='on-today';
+  document.getElementById('btnSB').className='';
+  runSim();
+});
+document.getElementById('btnSB').addEventListener('click', function(){
+  mode='sb';
+  this.className='on-sb';
+  document.getElementById('btnToday').className='';
+  runSim();
+});
+document.getElementById('replayBtn').addEventListener('click', runSim);
+
+/* ---------- setup interactions ---------- */
+document.getElementById('shopName').addEventListener('input', function(){
+  var v = this.value.trim() || 'your shop';
+  document.getElementById('shopNameEcho').textContent = v;
+});
+document.querySelectorAll('#vertChips .chip').forEach(function(ch){
+  ch.addEventListener('click', function(){
+    document.querySelectorAll('#vertChips .chip').forEach(function(x){x.classList.remove('on');});
+    this.classList.add('on');
+    vertical = this.dataset.v;
+    var t = parseInt(this.dataset.ticket);
+    var s = document.getElementById('sTicket');
+    s.value = t; calc();
+    runSim();
+  });
+});
+
+/* ---------- calculator ---------- */
+function calc(){
+  var miss = +document.getElementById('sMiss').value;
+  var conv = +document.getElementById('sConv').value;
+  var tick = +document.getElementById('sTicket').value;
+  document.getElementById('vMiss').textContent = miss;
+  document.getElementById('vConv').textContent = conv + '%';
+  document.getElementById('vTicket').textContent = money(tick);
+  var jobs = miss * 26 * (conv/100);
+  var monthLoss = jobs * tick;
+  document.getElementById('rJobs').textContent = jobs.toFixed(1) + ' jobs';
+  document.getElementById('rMonth').textContent = money(monthLoss);
+  document.getElementById('rYear').textContent = money(monthLoss*12);
+  document.getElementById('bigLost').textContent = money(monthLoss);
+  var jobsToBreakEven = Math.max(1, Math.ceil(149 / tick));
+  document.getElementById('payback').innerHTML =
+    'Switchboard pays for itself if it saves just <b>' + jobsToBreakEven +
+    (jobsToBreakEven===1?' job':' jobs') + ' a month</b>. Your current leak: <b>' +
+    jobs.toFixed(1) + ' jobs/month</b>.';
+}
+['sMiss','sConv','sTicket'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', calc);
+});
+
+/* ---------- boot ---------- */
+calc();
+runSim();
+</script>
+</body>
+</html>

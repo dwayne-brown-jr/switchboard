@@ -45,6 +45,7 @@ export function SettingsEditor({ initial }: { initial: WizardData }) {
     <div className="space-y-6">
       <ServicesSection data={data} update={update} />
       <HoursSection data={data} update={update} />
+      <SchedulingSection data={data} update={update} />
       <FaqsSection data={data} update={update} />
       <EmergenciesSection data={data} update={update} />
       <ContactSection data={data} update={update} />
@@ -56,7 +57,7 @@ export function SettingsEditor({ initial }: { initial: WizardData }) {
         {result.kind !== "qa" && result.kind !== "published" && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-500">
-              {dirty ? "You have unsaved changes." : "Edit any field, then check &amp; publish."}
+              {dirty ? "You have unsaved changes." : "Edit any field, then check & publish."}
             </p>
             <button className="btn-primary" disabled={pending} onClick={review}>
               {pending ? "Checking…" : "Check changes"}
@@ -125,9 +126,10 @@ function ServicesSection({ data, update }: P) {
     <Section title="Services & prices" desc="What your receptionist can talk about and book. Use ranges, never exact prices.">
       <div className="space-y-2">
         {data.services.map((s, i) => (
-          <div key={i} className="grid grid-cols-[1fr_140px_auto_auto] items-center gap-2">
+          <div key={i} className="grid grid-cols-[1fr_120px_92px_auto_auto] items-center gap-2">
             <input className="input" value={s.service} placeholder="Service" onChange={(e) => update({ services: rep(data.services, i, { ...s, service: e.target.value }) })} />
             <input className="input" value={s.priceRange} placeholder="Range (optional)" onChange={(e) => update({ services: rep(data.services, i, { ...s, priceRange: e.target.value }) })} />
+            <input className="input" type="number" min={1} step={5} value={s.durationMin ?? ""} placeholder="Min" title="Minutes this job takes (blank = default length)" disabled={!s.bookable} onChange={(e) => update({ services: rep(data.services, i, { ...s, durationMin: posInt(e.target.value) }) })} />
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
               <input type="checkbox" checked={s.bookable} onChange={(e) => update({ services: rep(data.services, i, { ...s, bookable: e.target.checked }) })} /> Bookable
             </label>
@@ -136,7 +138,30 @@ function ServicesSection({ data, update }: P) {
         ))}
       </div>
       <button className="btn-secondary mt-3" onClick={() => update({ services: [...data.services, { service: "", priceRange: "", bookable: true }] })}>+ Add service</button>
+      <p className="mt-2 text-xs text-slate-400">The <strong>Min</strong> column is how long each job takes — blank uses your default length (set under Scheduling).</p>
     </Section>
+  );
+}
+
+function SchedulingSection({ data, update }: P) {
+  return (
+    <Section title="Scheduling" desc="How your receptionist decides which appointment times to offer.">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <NumField label="Jobs at once" hint="How many appointments you can run at the same time (1 mobile van, or e.g. 3 bays)." value={data.capacity} min={1} step={1} onChange={(v) => update({ capacity: v ?? 1 })} />
+        <NumField label="Default length (min)" hint="Typical appointment length. Per-service times above override this." value={data.defaultDurationMin} min={5} step={5} onChange={(v) => update({ defaultDurationMin: v ?? 60 })} />
+        <NumField label="Travel/gap (min)" hint="Buffer around each job for drive time. 0 for none." value={data.bufferMin} min={0} step={5} onChange={(v) => update({ bufferMin: v ?? 0 })} />
+      </div>
+    </Section>
+  );
+}
+
+function NumField({ label, hint, value, min, step, onChange }: { label: string; hint?: string; value: number; min: number; step: number; onChange: (v: number | undefined) => void }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input className="input mt-1" type="number" inputMode="numeric" min={min} step={step} value={Number.isFinite(value) ? value : ""} onChange={(e) => onChange(posInt(e.target.value))} />
+      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
+    </label>
   );
 }
 
@@ -274,4 +299,9 @@ function rep<T>(arr: T[], i: number, v: T): T[] {
 }
 function rm<T>(arr: T[], i: number): T[] {
   return arr.filter((_, idx) => idx !== i);
+}
+// Positive integer, or undefined when blank/zero/invalid — callers apply defaults.
+function posInt(v: string): number | undefined {
+  const n = parseInt(v.trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }

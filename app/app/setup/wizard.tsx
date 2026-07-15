@@ -303,7 +303,7 @@ function ServicesStep({ data, update }: StepProps) {
       {prefillMsg && <p className="text-sm text-slate-600">{prefillMsg}</p>}
       <div className="space-y-3">
         {data.services.map((s, i) => (
-          <div key={i} className="grid grid-cols-[1fr_140px_auto_auto] items-center gap-2">
+          <div key={i} className="grid grid-cols-[1fr_120px_92px_auto_auto] items-center gap-2">
             <input
               className="input"
               value={s.service}
@@ -313,8 +313,19 @@ function ServicesStep({ data, update }: StepProps) {
             <input
               className="input"
               value={s.priceRange}
-              placeholder="Price range (optional)"
+              placeholder="Price (optional)"
               onChange={(e) => update({ services: replaceAt(data.services, i, { ...s, priceRange: e.target.value }) })}
+            />
+            <input
+              className="input"
+              type="number"
+              min={1}
+              step={5}
+              value={s.durationMin ?? ""}
+              placeholder="Min"
+              title="How long this job takes, in minutes (leave blank to use your default)"
+              disabled={!s.bookable}
+              onChange={(e) => update({ services: replaceAt(data.services, i, { ...s, durationMin: parsePosInt(e.target.value) }) })}
             />
             <label className="flex items-center gap-1.5 text-xs text-slate-600">
               <input type="checkbox" checked={s.bookable} onChange={(e) => update({ services: replaceAt(data.services, i, { ...s, bookable: e.target.checked }) })} />
@@ -329,7 +340,9 @@ function ServicesStep({ data, update }: StepProps) {
       <button type="button" className="btn-secondary" onClick={() => update({ services: [...data.services, { service: "", priceRange: "", bookable: true }] })}>
         + Add a service
       </button>
-      <p className="text-xs text-slate-400">Tip: leave price ranges blank if you&apos;d rather not quote — your receptionist never promises an exact price.</p>
+      <p className="text-xs text-slate-400">
+        The <strong>Min</strong> column is how long each job takes — leave it blank to use your default appointment length (set on the next step). Leave price ranges blank if you&apos;d rather not quote.
+      </p>
     </div>
   );
 }
@@ -369,7 +382,73 @@ function HoursStep({ data, update }: StepProps) {
           );
         })}
       </div>
+
+      <div className="space-y-4 rounded-xl border border-slate-200 p-4">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-800">How you take appointments</h4>
+          <p className="text-xs text-slate-500">This is how your receptionist decides which times to offer. You can change it anytime.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <NumberField
+            label="Jobs at once"
+            hint="How many appointments you can handle at the same time (e.g. 1 mobile van, or 3 bays)."
+            value={data.capacity}
+            min={1}
+            step={1}
+            onChange={(v) => update({ capacity: v ?? 1 })}
+          />
+          <NumberField
+            label="Default length (min)"
+            hint="Typical appointment length. Per-service times on the Services step override this."
+            value={data.defaultDurationMin}
+            min={5}
+            step={5}
+            onChange={(v) => update({ defaultDurationMin: v ?? 60 })}
+          />
+          <NumberField
+            label="Travel/gap (min)"
+            hint="Buffer left around each job — useful for mobile businesses that drive between appointments. 0 for none."
+            value={data.bufferMin}
+            min={0}
+            step={5}
+            onChange={(v) => update({ bufferMin: v ?? 0 })}
+          />
+        </div>
+      </div>
     </div>
+  );
+}
+
+// A labeled numeric input used by the scheduling controls.
+function NumberField({
+  label,
+  hint,
+  value,
+  min,
+  step,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  min: number;
+  step: number;
+  onChange: (v: number | undefined) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        className="input mt-1"
+        type="number"
+        inputMode="numeric"
+        min={min}
+        step={step}
+        value={Number.isFinite(value) ? value : ""}
+        onChange={(e) => onChange(parsePosInt(e.target.value))}
+      />
+      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
+    </label>
   );
 }
 
@@ -631,6 +710,12 @@ function replaceAt<T>(arr: T[], i: number, v: T): T[] {
 }
 function removeAt<T>(arr: T[], i: number): T[] {
   return arr.filter((_, idx) => idx !== i);
+}
+// Positive integer from an input, or undefined when empty/zero/invalid — so
+// callers apply their own default (blank per-service duration → shop default).
+function parsePosInt(v: string): number | undefined {
+  const n = parseInt(v.trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 function mergeServices(existing: WizardData["services"], found: WizardData["services"]) {
   const names = new Set(existing.map((s) => s.service.toLowerCase().trim()));

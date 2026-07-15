@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { getStats, formatMoney } from "./stats";
+import { plan } from "./plans";
 import { sendEmail } from "./email";
 import { signPayload } from "./secure";
 
@@ -20,6 +21,12 @@ export async function sendWeeklyDigest(shopId: string): Promise<{ sent: boolean;
   const unsubUrl = `${appUrl}/api/unsubscribe?shop=${shop.id}&token=${signPayload(`unsub:${shop.id}`)}`;
   const headline = `Your receptionist answered ${s.callsAnswered} call${s.callsAnswered === 1 ? "" : "s"} and booked ${s.jobsBooked} job${s.jobsBooked === 1 ? "" : "s"} worth about ${formatMoney(s.revenueBooked)} this week.`;
 
+  // ROI framing — the churn defense. Only when the captured value clears the
+  // plan price, so it always reads as a win rather than a stretch.
+  const planPrice = plan(shop.plan ?? "front_desk")?.price ?? 149;
+  const roiX = s.revenueBooked >= planPrice ? Math.round(s.revenueBooked / planPrice) : 0;
+  const roiLine = roiX >= 2 ? `That's roughly ${roiX}× the ${formatMoney(planPrice)} you pay for Switchboard — captured, not missed.` : "";
+
   const rows: [string, string][] = [
     ["Calls answered", `${s.callsAnswered}`],
     ["After-hours calls", `${s.afterHours}`],
@@ -32,11 +39,12 @@ export async function sendWeeklyDigest(shopId: string): Promise<{ sent: boolean;
   await sendEmail({
     to: shop.owner.email,
     subject: `${shop.businessName}: your week with Switchboard`,
-    text: `${headline}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\nSee details: ${appUrl}/app\n\nDon't want the weekly summary? Unsubscribe: ${unsubUrl}`,
+    text: `${headline}${roiLine ? `\n\n${roiLine}` : ""}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\nSee details: ${appUrl}/app\n\nDon't want the weekly summary? Unsubscribe: ${unsubUrl}`,
     html: `
       <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#0f172a">
         <h1 style="font-size:20px;margin:0 0 6px">This week at ${escapeHtml(shop.businessName)}</h1>
         <p style="font-size:16px;line-height:1.5;color:#1e293b">${escapeHtml(headline)}</p>
+        ${roiLine ? `<p style="margin:12px 0 0;padding:12px 16px;background:#eef2ff;border-radius:10px;font-size:15px;font-weight:600;color:#3730a3">${escapeHtml(roiLine)}</p>` : ""}
         <table style="width:100%;border-collapse:collapse;margin-top:16px">
           ${rows
             .map(

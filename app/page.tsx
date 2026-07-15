@@ -4,6 +4,7 @@ import { PLANS } from "@/lib/plans";
 import { VERTICALS, VERTICAL_DEFS, type Vertical } from "@/lib/verticals";
 import { DemoCall } from "@/components/demo-call";
 import { HeroCall } from "@/components/hero-call";
+import { RoiCalculator } from "@/components/roi-calculator";
 import { Reveal } from "@/components/reveal";
 import { ScrollLink } from "@/components/scroll-link";
 import { DEMO_TYPES, demoAgentEnvKey } from "@/lib/demo";
@@ -244,9 +245,13 @@ export default function Home() {
               <Eyebrow>Pricing</Eyebrow>
               <h2 className="mt-2 font-display text-3xl font-bold text-slate-900 sm:text-4xl">Simple, flat pricing</h2>
               <p className="mt-3 max-w-xl text-slate-600">
-                One flat price, ready when you are to go live. No per-call surprises. For context: the average service job
-                is worth $250–$500 — if your receptionist saves one missed call a month, it pays for itself.
+                One flat price — $149/mo with 500 talk-minutes included (about 5–6 calls a day). No per-call surprises;
+                if a busy month runs long, we scale your minutes and tell you first. See what missed calls are already
+                costing you:
               </p>
+            </Reveal>
+            <Reveal delay={60} className="mt-8">
+              <RoiCalculator />
             </Reveal>
             <div className={`mt-10 items-start gap-5 ${PLANS.length === 1 ? "mx-auto max-w-sm" : "grid sm:grid-cols-3"}`}>
               {PLANS.map((p, i) => (
@@ -278,6 +283,13 @@ export default function Home() {
                 </Reveal>
               ))}
             </div>
+            <Reveal delay={120} className="mx-auto mt-6 max-w-sm text-center">
+              <p className="text-sm text-slate-600">
+                About what you&apos;d spend on <span className="font-semibold text-slate-900">a few coffees a week</span> — versus{" "}
+                <span className="font-semibold text-slate-900">$3,000+/mo</span> for a front-desk hire who still clocks out at 5.
+              </p>
+              <p className="mt-2 text-sm font-medium text-brand-700">30-day money-back guarantee — cancel anytime.</p>
+            </Reveal>
           </div>
         </section>
 

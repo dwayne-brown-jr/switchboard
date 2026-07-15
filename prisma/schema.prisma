@@ -127,6 +127,7 @@ model Shop {
   agentNumber    String? // the AI's phone number
   twilioNumberSid String?
   calEventTypeMap Json? // LEGACY (pre-owned-scheduling Cal.com event-type map); unused — availability is now computed from config hours + own Booking rows
+  schedulingProvider String? // native (default) | google — which calendar backs availability/bookings (lib/schedulingProvider)
   a2pBrandSid    String?
   a2pCampaignSid String?
   a2pMessagingServiceSid String?

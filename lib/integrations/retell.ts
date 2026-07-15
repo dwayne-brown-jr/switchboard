@@ -51,6 +51,17 @@ async function api<T>(path: string, method: string, body?: unknown): Promise<T> 
   return (await res.json()) as T;
 }
 
+// Warm transfer: before merging the caller, the agent briefs the teammate on
+// who's calling and why. This is the objection-killer ("what if the AI can't
+// handle it?") and matters most for emergencies. Shape verified against the live
+// Retell API — warm_transfer requires agentic_transfer_config.
+const WARM_TRANSFER_OPTION = {
+  type: "warm_transfer",
+  agentic_transfer_config: {
+    prompt: "Briefly tell the teammate who is calling and why — the caller's name and one-line reason — then connect them.",
+  },
+};
+
 function toRetellTools(args: CreateAgentArgs): Record<string, unknown>[] {
   const tools: Record<string, unknown>[] = args.functions.map((f) => ({
     type: "custom",
@@ -70,9 +81,9 @@ function toRetellTools(args: CreateAgentArgs): Record<string, unknown>[] {
       type: "transfer_call",
       name: "transfer_to_human",
       description:
-        "Connect the caller to a live person at the business. Use ONLY when the caller needs something you genuinely cannot do, or explicitly asks for a person — and only after collecting their name, callback number, and reason.",
+        "Connect the caller to a live person at the business. Use when the caller needs something you genuinely cannot do, explicitly asks for a person, or describes a real emergency. First capture their name and callback number — unless it's a life-safety emergency where seconds matter.",
       transfer_destination: { type: "predefined", number: transferNum },
-      transfer_option: { type: "cold_transfer" },
+      transfer_option: WARM_TRANSFER_OPTION,
     });
   }
   return tools;
@@ -214,9 +225,9 @@ export function createRetellProvider(): VoiceProvider {
           type: "transfer_call",
           name: "transfer_to_human",
           description:
-            "Connect the caller to a live person at the business. Use ONLY when the caller needs something you genuinely cannot do, or explicitly asks for a person — and only after collecting their name, callback number, and reason.",
+            "Connect the caller to a live person at the business. Use when the caller needs something you genuinely cannot do, explicitly asks for a person, or describes a real emergency. First capture their name and callback number — unless it's a life-safety emergency where seconds matter.",
           transfer_destination: { type: "predefined", number: e164 },
-          transfer_option: { type: "cold_transfer" },
+          transfer_option: WARM_TRANSFER_OPTION,
         } as never);
       }
       await api(`/update-retell-llm/${llmId}`, "PATCH", { general_tools: tools });

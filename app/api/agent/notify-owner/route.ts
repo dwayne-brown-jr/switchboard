@@ -28,7 +28,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, delivered: false, note: "rate limited" });
     }
 
-    const delivered = await sendSms(shop.ownerMobile, shop.agentNumber, `${shop.businessName}: ${message}`);
+    const { withOptOut } = await import("@/lib/sms-consent");
+    const delivered = await sendSms(shop.ownerMobile, shop.agentNumber, withOptOut(`${shop.businessName}: ${message}`));
     return NextResponse.json({ ok: true, delivered });
   } catch (e) {
     // Never fail the agent's tool call — capture and report not-delivered.

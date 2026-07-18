@@ -94,7 +94,8 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
           : "";
         const svc = p.service ? ` (${p.service})` : "";
         const body = `📅 New booking${svc}${when} — ${shop.businessName}. Details on your dashboard.`;
-        await sendSms(to, shop.agentNumber, body).catch((e) => console.error("booking SMS failed", e));
+        const { withOptOut } = await import("./sms-consent");
+        await sendSms(to, shop.agentNumber, withOptOut(body)).catch((e) => console.error("booking SMS failed", e));
       }
     }
   }

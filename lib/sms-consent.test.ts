@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSmsKeyword, messagingTwiml, helpReplyText } from "./sms-consent";
+import { parseSmsKeyword, messagingTwiml, helpReplyText, withOptOut } from "./sms-consent";
 
 describe("parseSmsKeyword", () => {
   it("recognizes the standard STOP keywords", () => {
@@ -50,5 +50,29 @@ describe("helpReplyText", () => {
     expect(text).toContain("Riverside Auto");
     expect(text).toContain("STOP");
     expect(text).toContain("Msg & data rates");
+  });
+});
+
+describe("withOptOut", () => {
+  it("appends the opt-out line so sent traffic matches the registered samples", () => {
+    expect(withOptOut("New booking — Riverside Auto Care.")).toBe(
+      "New booking — Riverside Auto Care. Reply STOP to opt out.",
+    );
+  });
+
+  it("is idempotent — never double-appends when STOP is already present", () => {
+    const once = withOptOut("Urgent call flagged.");
+    expect(withOptOut(once)).toBe(once);
+    expect(once.match(/STOP/gi)).toHaveLength(1);
+  });
+
+  it("detects existing opt-out wording case-insensitively", () => {
+    const body = "Alert. Reply stop to unsubscribe.";
+    expect(withOptOut(body)).toBe(body);
+  });
+
+  it("still appends when a word merely contains 'stop'", () => {
+    // "stopped" is not the STOP keyword — the message needs real opt-out text.
+    expect(withOptOut("The engine stopped")).toContain("Reply STOP to opt out.");
   });
 });

@@ -70,6 +70,17 @@ export interface CallRow {
   hotJob: boolean;
   durationSec: number;
   recordingUrl: string | null;
+  summary: string | null;
+  handledAt: string | null;
+}
+export interface CallDetail extends CallRow {
+  transcript: string | null;
+}
+
+/** A call the owner should act on: unbooked or an emergency, not yet marked
+ *  handled. The needs-attention queue and badges all use this one rule. */
+export function needsAttention(c: Pick<CallRow, "booked" | "hotJob" | "handledAt">): boolean {
+  return (!c.booked || c.hotJob) && !c.handledAt;
 }
 export interface Appointment {
   id: string;
@@ -95,7 +106,23 @@ export const api = {
 
   home: () => request<HomeResponse>("/api/mobile/home"),
   calls: () => request<{ calls: CallRow[] }>("/api/mobile/calls"),
+  callDetail: (id: string) => request<{ call: CallDetail }>(`/api/mobile/calls/${id}`),
+  markHandled: (id: string, handled: boolean) =>
+    request<{ ok: boolean; handledAt: string | null }>(`/api/mobile/calls/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ handled }),
+    }),
   appointments: () => request<{ appointments: Appointment[] }>("/api/mobile/appointments"),
+  cancelAppointment: (id: string) =>
+    request<{ ok: boolean; status: string }>(`/api/mobile/appointments/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ action: "cancel" }),
+    }),
+  createBlock: (startUtc: string, endUtc: string, note?: string) =>
+    request<{ ok: boolean }>("/api/mobile/appointments/block", {
+      method: "POST",
+      body: JSON.stringify({ startUtc, endUtc, note }),
+    }),
   setPaused: (paused: boolean) =>
     request<{ status: string; paused: boolean }>("/api/mobile/pause", {
       method: "POST",

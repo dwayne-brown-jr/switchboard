@@ -24,6 +24,8 @@ export async function GET(req: Request) {
       hotJob: c.hotJob,
       durationSec: c.durationSec,
       recordingUrl: c.transcriptUrl, // Retell recording_url is stored here
+      summary: c.summary,
+      handledAt: c.handledAt,
     })),
   });
 }

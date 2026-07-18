@@ -222,7 +222,10 @@ model CallRecord {
   estJobValue   Int      @default(0)
   hotJob        Boolean  @default(false)
   recovered     Boolean  @default(false)
-  transcriptUrl String?
+  transcriptUrl String? // Retell recording_url (audio), not the transcript text
+  summary       String? // short post-call summary from the voice provider
+  transcript    String? // full transcript text
+  handledAt     DateTime? // owner marked this call's follow-up as done (mobile app)
   flags         Json?
 }
 

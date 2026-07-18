@@ -29,6 +29,19 @@ export function helpReplyText(businessName: string): string {
   return `${businessName} alerts (via Switchboard): booking + urgent-call texts for your business. Reply STOP to unsubscribe, START to resubscribe. Msg & data rates may apply.`;
 }
 
+/** Append the standard opt-out line to an outbound owner alert.
+ *
+ *  A2P campaigns are registered with sample messages, and carriers expect the
+ *  traffic to match them — our registered samples carry "Reply STOP to opt out",
+ *  so every alert must actually send it (a mismatch is a re-rejection risk, and
+ *  opt-out visibility is a CTIA expectation regardless).
+ *
+ *  Idempotent: a body that already mentions STOP is returned unchanged, so this
+ *  is safe to apply at the send site without double-appending. */
+export function withOptOut(body: string): string {
+  return /\bstop\b/i.test(body) ? body : `${body} Reply STOP to opt out.`;
+}
+
 /** Wrap an optional reply in Twilio Messaging TwiML. No message → empty
  *  <Response/> (acknowledge without auto-replying). */
 export function messagingTwiml(message?: string): string {

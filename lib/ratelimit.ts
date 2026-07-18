@@ -24,6 +24,7 @@ const limiters = {
   demo: make("demo", 3, "10 m"), // public landing-page real demo calls, per IP
   agentNotify: make("agentNotify", 8, "10 m"), // notify_owner SMS per shop (spam/cost guard)
   agentTool: make("agentTool", 20, "1 m"), // check-availability / create-booking per shop
+  demoLogin: make("demoLogin", 10, "10 m"), // reviewer demo-code attempts (brute-force guard)
   mobileAuth: make("mobileAuth", 8, "10 m"), // owner-app OTP request/verify, per IP
   mobileApi: make("mobileApi", 120, "1 m"), // owner-app data calls, per device
 };

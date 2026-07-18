@@ -5,8 +5,20 @@ import { nextCookies } from "better-auth/next-js";
 import { prisma } from "./db";
 import { sendEmail, magicLinkEmail } from "./email";
 import { isAdminEmail } from "./admin";
+import { isDemoEmail } from "./demo-login";
 
 const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+
+// Demo sign-in hand-off. better-auth calls sendMagicLink synchronously inside
+// signInMagicLink, so the /demo action that triggered it consumes this in the
+// SAME request — no cross-request state is shared, and the worst case under
+// concurrency is two reviewers swapping links to the same demo account.
+let pendingDemoLink: string | null = null;
+export function takePendingDemoLink(): string | null {
+  const url = pendingDemoLink;
+  pendingDemoLink = null;
+  return url;
+}
 
 // "Continue with Google" — the primary sign-in for shop owners (most have a
 // Gmail/Workspace account) and it needs no email delivery. Only enabled when
@@ -45,6 +57,13 @@ export const auth = betterAuth({
     magicLink({
       expiresIn: 60 * 15, // 15 minutes
       async sendMagicLink({ email, url }) {
+        // Demo reviewer account: there's no inbox to check, so capture the link
+        // for the /demo action to follow instead of emailing it. Everything
+        // after this point is the ordinary, verified magic-link flow.
+        if (isDemoEmail(email)) {
+          pendingDemoLink = url;
+          return;
+        }
         const { subject, html, text } = magicLinkEmail(url);
         await sendEmail({ to: email, subject, html, text });
         // Keep newly-created users flagged as admin if their email is allow-listed.

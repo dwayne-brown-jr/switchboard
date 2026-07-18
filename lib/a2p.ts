@@ -70,7 +70,9 @@ export async function pollA2P(shopId: string) {
   const shop = await prisma.shop.findUnique({ where: { id: shopId }, include: { owner: true } });
   if (!shop?.a2pBrandSid || shop.a2pStatus === "approved") return;
 
-  const status = await getA2PStatus(shop.a2pBrandSid);
+  // Brand AND campaign must both check out — see getA2PStatus. Passing the
+  // messaging service is what lets it verify the campaign.
+  const status = await getA2PStatus(shop.a2pBrandSid, shop.a2pMessagingServiceSid);
   if (status === "approved") {
     await prisma.shop.update({ where: { id: shopId }, data: { a2pStatus: "approved" } });
     await logAudit(shopId, null, "a2p.approved", {});

@@ -197,11 +197,22 @@ export async function submitA2P(shopId: string, info: A2PBusinessInfo, numberSid
 }
 
 /** Poll current A2P approval status. Mock returns "approved" to exercise the
- *  approval path (real path queries the brand/campaign status). */
-export async function getA2PStatus(brandSid: string): Promise<"submitted" | "approved" | "failed"> {
+ *  approval path.
+ *
+ *  Requires BOTH an approved brand AND a verified campaign. Brand approval alone
+ *  is NOT enough: carriers filter 10DLC traffic from a number whose CAMPAIGN
+ *  isn't registered/approved (error 30034 "unregistered number"), so treating a
+ *  green brand as "texting is on" makes the app believe it's sending while the
+ *  messages are silently dropped. When the campaign can't be confirmed we stay
+ *  "submitted" — texting stays off, which is the safe failure. */
+export async function getA2PStatus(
+  brandSid: string,
+  messagingServiceSid?: string | null,
+): Promise<"submitted" | "approved" | "failed"> {
   const c = creds();
   if (!c || brandSid.startsWith("BNmock")) return "approved";
   try {
+    // 1) Brand must be approved.
     const brand = await form<{ status?: string; identity_status?: string }>(
       `${MESSAGING}/a2p/BrandRegistrations/${brandSid}`,
       "GET",
@@ -209,10 +220,30 @@ export async function getA2PStatus(brandSid: string): Promise<"submitted" | "app
       c.token,
     );
     const s = (brand.status ?? brand.identity_status ?? "").toUpperCase();
-    if (s.includes("APPROVED") || s.includes("VERIFIED")) return "approved";
     if (s.includes("FAIL") || s.includes("REJECT")) return "failed";
+    if (!(s.includes("APPROVED") || s.includes("VERIFIED"))) return "submitted";
+
+    // 2) ...AND the campaign attached to the shop's messaging service must be
+    //    verified. No messaging service on file → nothing to verify → not approved.
+    if (!messagingServiceSid) {
+      console.warn(`a2p: brand ${brandSid} approved but no messagingServiceSid on file — keeping SMS off`);
+      return "submitted";
+    }
+    const campaign = await form<{ campaign_status?: string; status?: string }>(
+      `${MESSAGING}/Services/${messagingServiceSid}/Compliance/Usa2p`,
+      "GET",
+      c.sid,
+      c.token,
+    );
+    const cs = (campaign.campaign_status ?? campaign.status ?? "").toUpperCase();
+    if (cs.includes("FAIL") || cs.includes("REJECT")) return "failed";
+    if (cs.includes("APPROVED") || cs.includes("VERIFIED")) return "approved";
+    console.warn(`a2p: brand ${brandSid} approved but campaign status is "${cs || "unknown"}" — keeping SMS off`);
     return "submitted";
-  } catch {
+  } catch (e) {
+    // Unreadable (no campaign registered yet, or the API rejected the read) —
+    // fail closed rather than enabling texting we can't prove is deliverable.
+    console.warn(`a2p: could not confirm approval for brand ${brandSid} — keeping SMS off:`, (e as Error).message);
     return "submitted";
   }
 }

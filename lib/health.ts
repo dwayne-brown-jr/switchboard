@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "./db";
 import { reportError } from "./observability";
 import { notifyAdmins } from "./notify";
+import { DEMO_SHOP_ID } from "./demo-login";
+import { SILENT_DAYS, classifyCallPath, type CallPathStatus } from "./call-path";
 
 // Proactive voice-path health check. A live shop whose Twilio number silently
 // stops routing (SIP trunk issue, unbound number, carrier problem) would take
@@ -9,8 +11,43 @@ import { notifyAdmins } from "./notify";
 // but we CAN watch for the tell-tale symptom: a shop that WAS receiving calls
 // and suddenly goes quiet. Runs from a daily cron (/api/jobs/health-check).
 
-const SILENT_DAYS = Number(process.env.SILENT_SHOP_DAYS ?? 4);
 const REALERT_HOURS = 24;
+
+/** Read-only view of the voice path for external monitoring (/api/health/calls).
+ *
+ *  Writes nothing and alerts nobody — detectSilentShops() below owns alerting.
+ *  The point of having both is an alert path that does not depend on our own
+ *  email: if Resend is down or misconfigured, notifyAdmins() never arrives and
+ *  nothing tells us. Checkly polling this endpoint is out-of-band.
+ *
+ *  Reports counts only — never shop names or ids. This is a public endpoint and
+ *  shop counts would disclose business scale.
+ *
+ *  `misconfigured` is the faster signal of the two: a live shop with no number
+ *  or no live agent version cannot answer a call right now, and unlike silence
+ *  that needs no multi-day window to be certain about. */
+export async function callPathStatus(): Promise<CallPathStatus> {
+  const live = await prisma.shop.findMany({
+    where: { status: "live", id: { not: DEMO_SHOP_ID } },
+    select: { id: true, agentNumber: true, liveVersionId: true },
+  });
+
+  const answerable = live.filter((s) => s.agentNumber && s.liveVersionId).map((s) => s.id);
+  const lastCalls = answerable.length
+    ? await prisma.callRecord.groupBy({
+        by: ["shopId"],
+        where: { shopId: { in: answerable } },
+        _max: { timestamp: true },
+      })
+    : [];
+
+  const lastCallByShop = new Map<string, Date>();
+  for (const row of lastCalls) {
+    if (row._max.timestamp) lastCallByShop.set(row.shopId, row._max.timestamp);
+  }
+
+  return classifyCallPath(live, lastCallByShop, Date.now());
+}
 
 /** Flag live shops that had call history and then went silent for SILENT_DAYS —
  *  a likely broken voice path. Deliberately skips shops with NO call history
@@ -19,7 +56,10 @@ const REALERT_HOURS = 24;
 export async function detectSilentShops(): Promise<{ scanned: number; silent: number }> {
   const cutoff = Date.now() - SILENT_DAYS * 86_400_000;
   const shops = await prisma.shop.findMany({
-    where: { status: "live", liveVersionId: { not: null } },
+    // The reviewer demo shop is "live" with mock calls frozen at seed time, so it
+    // reads as a silent shop a few days after every seed. Excluded everywhere we
+    // reason about real call volume.
+    where: { status: "live", liveVersionId: { not: null }, id: { not: DEMO_SHOP_ID } },
     select: { id: true, businessName: true },
   });
 

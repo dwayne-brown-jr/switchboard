@@ -52,6 +52,46 @@ new ApiCheck("health-db", {
 });
 
 /**
+ * The one check that watches the PRODUCT rather than the app.
+ *
+ * Everything else here can be green while Switchboard is failing at its only
+ * promise: if a Twilio number stops routing or a live shop loses its agent
+ * version, calls go unanswered and /api/health still reports a healthy app and
+ * database. This asserts the voice path itself is intact.
+ *
+ * There is already a daily cron (jobs/health-check) that pages admins about
+ * silent shops. This is deliberately a second, independent path: that one
+ * alerts through our own email, so if Resend breaks the warning never arrives
+ * and nothing says so. Checkly is out-of-band.
+ *
+ * Hourly is ample — the silence window is measured in days, and the faster
+ * signal it carries (a live shop with no number or no agent version) is a
+ * config regression that will not fix itself. Budget: 720 runs/month, taking
+ * the project to 7,920 of 10,000.
+ */
+new ApiCheck("health-call-path", {
+  name: "Voice path — live shops still receiving calls",
+  tags: ["critical", "voice"],
+  frequency: Frequency.EVERY_1H,
+  degradedResponseTime: DEGRADED_MS,
+  maxResponseTime: MAX_MS,
+  alertChannels,
+  request: {
+    url: `${BASE}/api/health/calls`,
+    method: "GET",
+    followRedirects: false,
+    assertions: [
+      AssertionBuilder.statusCode().equals(200),
+      // "degraded" means a live shop went silent or can't answer at all. The
+      // endpoint returns 200 either way, so the body is the verdict.
+      AssertionBuilder.jsonBody("$.status").equals("ok"),
+      AssertionBuilder.jsonBody("$.silent").equals(0),
+      AssertionBuilder.jsonBody("$.misconfigured").equals(0),
+    ],
+  },
+});
+
+/**
  * The landing page is the entire top of funnel: the demo call, the ROI
  * calculator and the pricing all live here. A 500 here costs signups directly.
  */

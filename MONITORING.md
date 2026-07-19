@@ -15,6 +15,7 @@ before a customer does.
 | Check | What it proves | Frequency |
 |---|---|---|
 | **Health — app + Turso** (`__checks__/api/critical.check.ts`) | App serving **and** the database is reachable. Asserts `status:"ok"` and `db:"ok"`, not just HTTP 200. | 10 min |
+| **Voice path** (`__checks__/api/critical.check.ts`) | The *product* still works: no live shop has gone silent past the window, and none is live-but-unanswerable (missing number or agent version). | 1 hour |
 | **Landing page** | Top of funnel renders — asserts the hero headline is actually in the HTML, so an error shell fails. | 30 min |
 | **Retell `call-events` reachable** (`__checks__/api/webhooks.check.ts`) | The call webhook route exists. Sends `GET` and expects **405** — see "why 405" below. | 1 hour |
 | **A2P opt-in page** | `/sms-opt-in` is up and still contains the exact consent sentence carriers review. | 1 hour |
@@ -31,6 +32,26 @@ Sending `GET` to a `POST`-only route returns **405**, which proves the route is
 deployed and routable **without invoking any handler logic**. Verified against
 production: every webhook route returns 405 on GET today. If one starts
 returning 200, that's a genuine regression and the check fails.
+
+### Why the voice-path check exists separately from the daily cron
+
+`jobs/health-check` already detects silent shops daily and pages admins. The
+Checkly check is a **second, independent path to the same finding**, for two
+reasons:
+
+1. **The cron alerts through our own email.** If Resend breaks or the sender
+   domain lapses, `notifyAdmins()` never arrives and nothing reports that.
+   Checkly is out-of-band.
+2. **The heartbeat only proves the job ran, not what it found.** A green
+   heartbeat and a silent shop are perfectly compatible.
+
+It also carries a faster signal the cron doesn't: a shop that is `live` but has
+no number or no live agent version can't answer *right now*, which needs no
+multi-day silence window to be sure about.
+
+The reviewer demo shop is excluded everywhere (`DEMO_SHOP_ID`) — its calls are
+mock data frozen at seed time, so it reads as a silent live shop a few days
+after every seed.
 
 ### What is deliberately NOT monitored
 - **Vendor APIs** (Retell, Twilio, Stripe, Anthropic). A third-party blip would
@@ -58,7 +79,7 @@ every 30m = 1,440
 every 60m =   720
 ```
 
-**Current spend: 7,200 / 10,000 API runs · 720 / 1,000 browser runs.**
+**Current spend: 7,920 / 10,000 API runs · 720 / 1,000 browser runs.**
 
 **One location (`us-west-1`) on purpose.** Locations multiply run count.
 us-west-1 is closest to our California customers and to the Vercel region.

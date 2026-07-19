@@ -45,6 +45,12 @@ new ApiCheck("webhook-retell-call-events", {
   degradedResponseTime: COLD_DEGRADED_MS,
   maxResponseTime: COLD_MAX_MS,
   alertChannels,
+  // REQUIRED when the expected status is an error code. Checkly fails any
+  // non-2xx response by default, regardless of assertions — without this the
+  // check reports failed while printing "✔ status code equals 405. Received:
+  // 405." Inverting it means the assertions below decide the verdict, so a 405
+  // passes and an unexpected 200 or 404 fails.
+  shouldFail: true,
   request: {
     url: `${BASE}/api/agent/call-events`,
     method: "GET",

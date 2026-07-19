@@ -18,14 +18,15 @@ import { alertChannels } from "../alert-channels";
 new BrowserCheck("dashboard-login-flow", {
   name: "Dashboard — sign in and load call history",
   tags: ["critical", "dashboard"],
-  // Deactivated again: the demo sign-in is intermittently failing in production.
-  // It passed once (5s), then failed every subsequent run — the code is accepted
-  // and the magic link is followed, but no session is established and /app
-  // bounces to /login. Ruled out: the Checkly secret (fails with a local env var
-  // too) and rate limiting (still fails after a quiet window, and a throttle
-  // redirects to /demo?error=slow, not /login). Root cause not yet found, so
-  // this stays off rather than alerting hourly on a known-broken flow.
-  activated: false,
+  // Active. This check caught a real bug the first time it ran: demo sign-in
+  // redirected to the magic-link URL from a Server Action, so Next resolved that
+  // redirect server-side and the session cookie never reached the browser. Fixed
+  // by moving the redirect into a route handler — see app/demo/enter/route.ts.
+  //
+  // Re-enabled only after four passing runs spaced past better-auth's 60s auth
+  // rate-limit window, at a steady 9-10s. One green run is not evidence of a
+  // working flow; that mistake is what put this check live while broken.
+  activated: true,
   frequency: Frequency.EVERY_1H,
   alertChannels,
   code: {

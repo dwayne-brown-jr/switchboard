@@ -6,7 +6,10 @@ import { DEMO_TYPES, demoType, resolveVars, type DemoTypeId, type Line } from "@
 
 type Phase = "idle" | "connecting" | "live" | "error";
 
-export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
+/** `compact` renders the demo as a single stacked column with the personalize
+ *  fields tucked behind a disclosure — so the real, working demo can sit in the
+ *  hero next to the headline instead of a decorative fake below the fold. */
+export function DemoCall({ realCallEnabled, compact = false }: { realCallEnabled: boolean; compact?: boolean }) {
   const [type, setType] = useState<DemoTypeId>("auto");
   const [phase, setPhase] = useState<Phase>("idle");
   // Pre-filled with a real example so the demo works with zero typing —
@@ -106,11 +109,34 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
     if (lines.length > 0) setHasTalked(true);
   }
 
+  const personalizeFields = (
+    <>
+      <input
+        className="input"
+        value={form.business}
+        onChange={(e) => setForm({ ...form, business: e.target.value })}
+        placeholder={`Business name — e.g. ${def.defaults.business}`}
+      />
+      <input
+        className="input"
+        value={form.city}
+        onChange={(e) => setForm({ ...form, city: e.target.value })}
+        placeholder={`City — e.g. ${def.defaults.city}`}
+      />
+      <input
+        className="input"
+        value={form.service}
+        onChange={(e) => setForm({ ...form, service: e.target.value })}
+        placeholder={`${def.serviceLabel} — e.g. ${def.defaults.service}`}
+      />
+    </>
+  );
+
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className={compact ? "grid gap-4" : "grid gap-6 lg:grid-cols-2"}>
       {/* Left: controls */}
       <div>
-        <span className="label">1. Pick a business type</span>
+        <span className="label">{compact ? "Pick a business type" : "1. Pick a business type"}</span>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           {DEMO_TYPES.map((t) => (
             <button
@@ -128,25 +154,21 @@ export function DemoCall({ realCallEnabled }: { realCallEnabled: boolean }) {
         <p className="mt-2 text-xs text-slate-500">{def.blurb}</p>
 
         <div className="mt-5 space-y-3">
-          <span className="label">2. Make it yours (optional)</span>
-          <input
-            className="input"
-            value={form.business}
-            onChange={(e) => setForm({ ...form, business: e.target.value })}
-            placeholder={`Business name — e.g. ${def.defaults.business}`}
-          />
-          <input
-            className="input"
-            value={form.city}
-            onChange={(e) => setForm({ ...form, city: e.target.value })}
-            placeholder={`City — e.g. ${def.defaults.city}`}
-          />
-          <input
-            className="input"
-            value={form.service}
-            onChange={(e) => setForm({ ...form, service: e.target.value })}
-            placeholder={`${def.serviceLabel} — e.g. ${def.defaults.service}`}
-          />
+          {compact ? (
+            <details className="group rounded-xl border border-slate-200 bg-white/60 px-3 py-2">
+              <summary className="cursor-pointer list-none text-sm font-medium text-slate-600 marker:content-none hover:text-slate-900">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="transition group-open:rotate-90">›</span> Make it yours (optional)
+                </span>
+              </summary>
+              <div className="mt-3 space-y-3">{personalizeFields}</div>
+            </details>
+          ) : (
+            <>
+              <span className="label">2. Make it yours (optional)</span>
+              {personalizeFields}
+            </>
+          )}
 
           <div className="pt-1">
             {!realCallEnabled ? (

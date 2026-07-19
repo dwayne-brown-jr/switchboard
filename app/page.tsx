@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { PLANS } from "@/lib/plans";
 import { VERTICALS, VERTICAL_DEFS, type Vertical } from "@/lib/verticals";
 import { DemoCall } from "@/components/demo-call";
-import { HeroCall } from "@/components/hero-call";
 import { RoiCalculator } from "@/components/roi-calculator";
+import { PlanFit } from "@/components/plan-fit";
 import { Reveal } from "@/components/reveal";
 import { ScrollLink } from "@/components/scroll-link";
 import { DEMO_TYPES, demoAgentEnvKey } from "@/lib/demo";
@@ -94,8 +94,8 @@ export default function Home() {
       </header>
 
       <main>
-        {/* Hero */}
-        <section className="relative overflow-hidden">
+        {/* Hero — also the #demo anchor, since the live demo now lives here */}
+        <section id="demo" className="relative scroll-mt-16 overflow-hidden">
           <div className="mesh pointer-events-none absolute inset-0" />
           <div className="dot-grid pointer-events-none absolute inset-0" />
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:py-28">
@@ -108,15 +108,16 @@ export default function Home() {
                 For local service businesses that live on the phone
               </div>
               <h1 className="rise mt-5 max-w-2xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl" style={{ animationDelay: "80ms" }}>
-                Never miss another call — <span className="text-gradient">or the job that came with it.</span>
+                An answering service takes a message.{" "}
+                <span className="text-gradient">Switchboard books the job.</span>
               </h1>
               <p className="rise mt-6 max-w-xl text-lg leading-8 text-slate-600" style={{ animationDelay: "160ms" }}>
-                Switchboard sets up a friendly AI receptionist that answers every call, books appointments, and texts you
-                the urgent ones. You answer a few questions about your shop; we build and configure the rest.
+                A friendly AI receptionist answers every call 24/7, books straight onto your calendar, and texts you the
+                urgent ones. Talk to it yourself right now — no sign-up, no phone needed.
               </p>
               <div className="rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "240ms" }}>
                 <Link href="/login" className="btn-accent px-5 py-3 text-base">Set up my receptionist</Link>
-                <ScrollLink href="#demo" className="btn-secondary px-5 py-3 text-base">▶ Hear it live</ScrollLink>
+                <ScrollLink href="#pricing" className="btn-secondary px-5 py-3 text-base">See pricing</ScrollLink>
               </div>
               <div className="rise mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500" style={{ animationDelay: "320ms" }}>
                 {["Keep your current number", "Answers 24/7", "Go live the same day"].map((t) => (
@@ -126,26 +127,23 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="rise flex justify-center lg:justify-end" style={{ animationDelay: "300ms" }}>
-              <HeroCall />
+            {/* The real, working demo lives in the hero — not a decorative
+                animation below the fold. Visitors talk to the product before
+                they read a single feature. */}
+            <div className="rise" style={{ animationDelay: "300ms" }}>
+              <div className="rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-xl shadow-brand-500/5 backdrop-blur sm:p-6">
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="relative inline-flex h-2 w-2 text-accent-500">
+                    <span className="ping-ring absolute inline-flex h-2 w-2 rounded-full" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-500" />
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Try it live — no sign-up
+                  </span>
+                </div>
+                <DemoCall realCallEnabled={realCallEnabled} compact />
+              </div>
             </div>
-          </div>
-        </section>
-
-        {/* Live demo */}
-        <section id="demo" className="scroll-mt-16 border-t border-slate-200 bg-white">
-          <div className="mx-auto max-w-6xl px-6 py-20">
-            <Reveal>
-              <Eyebrow>Live demo</Eyebrow>
-              <h2 className="mt-2 font-display text-3xl font-bold text-slate-900 sm:text-4xl">Hear it for yourself</h2>
-              <p className="mt-3 max-w-xl text-slate-600">
-                Pick a business type, make it yours, and have a real conversation with the AI receptionist — a live voice,
-                right in your browser. No sign-up, no phone needed.
-              </p>
-            </Reveal>
-            <Reveal delay={100} className="mt-10 rounded-3xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8">
-              <DemoCall realCallEnabled={realCallEnabled} />
-            </Reveal>
           </div>
         </section>
 
@@ -283,7 +281,10 @@ export default function Home() {
                 </Reveal>
               ))}
             </div>
-            <Reveal delay={120} className="mx-auto mt-6 max-w-sm text-center">
+            <Reveal delay={110} className="mx-auto mt-6 max-w-sm">
+              <PlanFit />
+            </Reveal>
+            <Reveal delay={150} className="mx-auto mt-6 max-w-sm text-center">
               <p className="text-sm text-slate-600">
                 About what you&apos;d spend on <span className="font-semibold text-slate-900">a few coffees a week</span> — versus{" "}
                 <span className="font-semibold text-slate-900">$3,000+/mo</span> for a front-desk hire who still clocks out at 5.

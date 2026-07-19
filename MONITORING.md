@@ -67,6 +67,32 @@ upgrading to Starter ($24/mo, 25k API runs), then update `checkly.config.ts`.
 
 ---
 
+## Current status (deployed)
+
+Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
+`dwaynebrown2012@gmail.com`; all 11 checks are subscribed.
+
+| | State |
+|---|---|
+| 4 API checks | ✅ passing |
+| 6 cron heartbeats | ✅ created, ping URLs wired into Vercel |
+| `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
+| Browser check | ⏸️ deployed but **inactive** — waiting on the demo env vars below |
+
+The other five heartbeats show no data until their first scheduled run (daily
+jobs within 24h, the weekly digest by next Monday). Their grace periods are long
+enough that this is expected, not a fault.
+
+**Remaining to do:** set `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` in Vercel, seed
+the demo shop, add `DEMO_LOGIN_CODE` to Checkly, then flip the browser check to
+`activated: true`. Full steps in "Activate the browser check" below.
+
+> One cosmetic note: the account has two email alert channels — Checkly creates a
+> default one on signup (0 subscriptions, sends nothing) alongside the one this
+> project manages. Harmless; delete the empty one in the UI if it bothers you.
+
+---
+
 ## First-time setup
 
 ### 1. Authenticate the CLI

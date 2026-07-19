@@ -16,8 +16,22 @@ import Link from "next/link";
 //   3. Three or more logos-> replace the whole band with a logo wall and move
 //      these signals down beside the pricing card.
 
-// The public auto-repair demo line (scripts/provision-demo-lines.mjs). Change
-// here if the number is ever re-provisioned.
+// The public auto-repair demo line. The number lives in Twilio (friendly name
+// sb_demo_auto, routed via the Retell SIP trunk); Retell binds it to an agent
+// through the phone number's `inbound_agents` array — note `inbound_agent_id`
+// is deprecated and now rejected.
+//
+// It points at the Riverside Auto Care demo shop's agent, so a prospect calling
+// this number exercises the real product: the call lands in a real dashboard
+// with real booking. That agent is deliberately NOT a stock demo agent, and two
+// things are true of it on purpose:
+//   * transfer_to_human is removed — this is a public number, and the transfer
+//     target was a real personal phone.
+//   * the greeting says "a live demo of Switchboard" so a caller who dials
+//     without reading this page is not misled about reaching a real shop.
+// Re-provisioning the agent from shop config would restore the transfer tool
+// (lib/integrations/retell.ts builds it from config.transferNumber) — check
+// that before publishing changes to this shop.
 const DEMO_LINE = "+17608005628";
 const DEMO_LINE_DISPLAY = "(760) 800-5628";
 

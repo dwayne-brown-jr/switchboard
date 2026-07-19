@@ -20,6 +20,18 @@ import { alertChannels } from "../alert-channels";
 
 const BASE = process.env.MONITOR_BASE_URL ?? "https://getswitchboardhq.com";
 
+// Cold-start tolerance. These routes are hit hourly at most (call-events only
+// sees real Retell traffic), so on Vercel they are ALWAYS cold when we probe
+// them — a first hit measured 2s in testing. With a 2s degraded threshold that
+// meant a degraded alert on literally every run, forever.
+//
+// Latency is not the signal here anyway: these checks answer "is the route
+// deployed and routable", and that's the status code's job. Thresholds are set
+// loose enough that only a genuinely stuck edge trips them. The health check
+// keeps tight thresholds, because there slow IS the signal.
+const COLD_DEGRADED_MS = 6000;
+const COLD_MAX_MS = 12000;
+
 /**
  * The Retell webhook. Every completed call posts here; if it breaks, calls
  * still get answered but nothing is recorded — no dashboard, no digest, no
@@ -30,8 +42,8 @@ new ApiCheck("webhook-retell-call-events", {
   name: "Webhook reachable — Retell call-events",
   tags: ["webhooks", "critical"],
   frequency: Frequency.EVERY_1H,
-  degradedResponseTime: 2000,
-  maxResponseTime: 5000,
+  degradedResponseTime: COLD_DEGRADED_MS,
+  maxResponseTime: COLD_MAX_MS,
   alertChannels,
   request: {
     url: `${BASE}/api/agent/call-events`,
@@ -53,8 +65,8 @@ new ApiCheck("public-sms-opt-in", {
   name: "A2P opt-in page (carrier-visible)",
   tags: ["compliance"],
   frequency: Frequency.EVERY_1H,
-  degradedResponseTime: 2000,
-  maxResponseTime: 5000,
+  degradedResponseTime: COLD_DEGRADED_MS,
+  maxResponseTime: COLD_MAX_MS,
   alertChannels,
   request: {
     url: `${BASE}/sms-opt-in`,

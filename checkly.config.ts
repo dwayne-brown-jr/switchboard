@@ -14,7 +14,7 @@ import { Frequency, RetryStrategyBuilder } from "checkly/constructs";
 //   every 30m = 1,440
 //   every 60m =   720
 //
-// Current spend: 7,200 / 10,000 API runs, 720 / 1,000 browser runs.
+// Current spend: 7,920 / 10,000 API runs, 720 / 1,000 browser runs.
 //
 // ONE LOCATION ON PURPOSE. Locations multiply run count, so us-west-1 only —
 // it is also closest to the California local businesses we serve and to the

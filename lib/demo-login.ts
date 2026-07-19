@@ -18,6 +18,12 @@ import { secretEquals } from "./secure";
 // blast radius is that shop's fake data. Keep it that way: never point
 // DEMO_LOGIN_EMAIL at an admin or at a shop with real billing/telephony.
 
+/** The seeded reviewer shop (scripts/seed-demo-shop.mjs uses this same fixed id).
+ *  Its calls are mock data generated at seed time, so it must be excluded from
+ *  anything that reasons about real call volume — otherwise it looks like a live
+ *  shop that went silent a few days after every seed. */
+export const DEMO_SHOP_ID = "demo_reviewer_shop";
+
 export function demoEmail(): string | null {
   return process.env.DEMO_LOGIN_EMAIL?.trim() || null;
 }

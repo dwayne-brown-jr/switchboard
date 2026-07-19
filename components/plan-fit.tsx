@@ -57,29 +57,49 @@ export function PlanFit() {
         month, at a typical {AVG_CALL_MIN}-minute call.
       </p>
 
+      {/* Every branch starts from the one purchasable plan. There is exactly one
+          plan to buy ({base.price}); higher tiers are automatic upgrades, never a
+          checkout choice — so the copy must never imply a plan you can select. */}
       <div className="mt-4 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
-        {fit ? (
+        {fit && fit.id === base.id ? (
           <>
             <p className="text-[15px] font-semibold text-slate-900">
-              Covered by {fit.id === base.id ? "your" : "the"} {money(fit.price)}/mo plan.
+              Comfortably inside the {money(base.price)} plan.
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {fit.includedMinutes.toLocaleString()} minutes are included
-              {fit.id === base.id
-                ? " — no overage, no per-call fees."
-                : ` — if you outgrow ${money(base.price)}, we move you here and tell you first. Never a surprise bill.`}
+              {base.includedMinutes.toLocaleString()} minutes are included — no overage, no per-call fees.
+            </p>
+          </>
+        ) : fit ? (
+          <>
+            <p className="text-[15px] font-semibold text-slate-900">
+              You&apos;d still start at {money(base.price)}{" "}
+              — then we&apos;d move you up.
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              That&apos;s past the {base.includedMinutes.toLocaleString()}{" "}
+              minutes included, so we&apos;d shift you to our higher tier ({money(fit.price)}/mo,{" "}
+              {fit.includedMinutes.toLocaleString()}{" "}
+              minutes) — and tell you before we do. Nothing extra to pick, and never a surprise bill.
             </p>
           </>
         ) : (
           <>
-            <p className="text-[15px] font-semibold text-slate-900">Busier than our standard plans — let&apos;s talk.</p>
+            <p className="text-[15px] font-semibold text-slate-900">
+              You&apos;d still start at {money(base.price)}{" "}
+              — then we&apos;d talk.
+            </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               Above {top.includedMinutes.toLocaleString()}{" "}
-              minutes we&apos;ll price it with you directly, rather than letting a bill surprise you.
+              minutes we price it with you directly, rather than letting a bill surprise you.
             </p>
           </>
         )}
       </div>
+
+      <p className="mt-3 text-center text-xs text-slate-400">
+        There&apos;s only one plan to choose. Busier months are handled for you.
+      </p>
     </div>
   );
 }

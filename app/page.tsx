@@ -5,6 +5,7 @@ import { VERTICALS, VERTICAL_DEFS, type Vertical } from "@/lib/verticals";
 import { DemoCall } from "@/components/demo-call";
 import { RoiCalculator } from "@/components/roi-calculator";
 import { PlanFit } from "@/components/plan-fit";
+import { TrustBand } from "@/components/trust-band";
 import { Reveal } from "@/components/reveal";
 import { ScrollLink } from "@/components/scroll-link";
 import { DEMO_TYPES, demoAgentEnvKey } from "@/lib/demo";
@@ -146,6 +147,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Proof band — sits where a logo wall goes once there are customers */}
+        <TrustBand />
 
         {/* How it works */}
         <section id="how-it-works" className="scroll-mt-16">

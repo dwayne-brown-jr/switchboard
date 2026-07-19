@@ -77,15 +77,20 @@ Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
 | 4 API checks | ✅ passing |
 | 6 cron heartbeats | ✅ created, ping URLs wired into Vercel |
 | `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
-| Browser check | ⏸️ deployed but **inactive** — waiting on the demo env vars below |
+| Browser check | ✅ **active** — signs in at `/demo` and asserts the dashboard renders |
 
 The other five heartbeats show no data until their first scheduled run (daily
 jobs within 24h, the weekly digest by next Monday). Their grace periods are long
 enough that this is expected, not a fault.
 
-**Remaining to do:** set `DEMO_LOGIN_EMAIL` + `DEMO_LOGIN_CODE` in Vercel, seed
-the demo shop, add `DEMO_LOGIN_CODE` to Checkly, then flip the browser check to
-`activated: true`. Full steps in "Activate the browser check" below.
+**Demo login is live.** `DEMO_LOGIN_EMAIL` (`demo@getswitchboardhq.com`) and
+`DEMO_LOGIN_CODE` are set in Vercel production, the reviewer shop is seeded with
+mock calls, and `DEMO_LOGIN_CODE` is stored as a secret in Checkly. The same
+credentials double as reviewer access for pilot prospects.
+
+> **Rotating the demo code:** change it in **both** Vercel and Checkly, or this
+> check fails on sign-in. Clearing the Checkly variable is the safe way to pause
+> it — the spec self-skips rather than false-alarming.
 
 > One cosmetic note: the account has two email alert channels — Checkly creates a
 > default one on signup (0 subscriptions, sends nothing) alongside the one this

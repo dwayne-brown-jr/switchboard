@@ -6,9 +6,21 @@ import { alertChannels } from "../alert-channels";
 
 const BASE = process.env.MONITOR_BASE_URL ?? "https://getswitchboardhq.com";
 
-// Degraded/failed thresholds are shared so they can't drift apart per check.
-const DEGRADED_MS = 2000;
-const MAX_MS = 5000;
+// Degraded/failed thresholds, set from measured production latency rather than
+// round numbers. Six consecutive probes of /api/health gave:
+//   warm  0.24s – 0.40s total (Turso round trip 66–67ms)
+//   cold  2.24s total, and a 1.01s outlier with an 858ms Turso round trip
+//
+// A 2s degraded threshold therefore fired on ordinary cold starts — and at a
+// 10-minute frequency the function sits right at the edge of Vercel's warm
+// window, so that would have been intermittent false alarms forever. 4s clears
+// the observed cold start with headroom while still catching a genuinely sick
+// database; 10s is a hard fail.
+//
+// Deliberately NOT loosened further: unlike the reachability checks, slow here
+// is real signal — it usually means Turso, and Turso is the whole product.
+const DEGRADED_MS = 4000;
+const MAX_MS = 10000;
 
 /**
  * The one check that tests something a deploy can't guarantee: Turso is

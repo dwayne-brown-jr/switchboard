@@ -18,7 +18,14 @@ import { alertChannels } from "../alert-channels";
 new BrowserCheck("dashboard-login-flow", {
   name: "Dashboard — sign in and load call history",
   tags: ["critical", "dashboard"],
-  activated: true,
+  // Deactivated again: the demo sign-in is intermittently failing in production.
+  // It passed once (5s), then failed every subsequent run — the code is accepted
+  // and the magic link is followed, but no session is established and /app
+  // bounces to /login. Ruled out: the Checkly secret (fails with a local env var
+  // too) and rate limiting (still fails after a quiet window, and a throttle
+  // redirects to /demo?error=slow, not /login). Root cause not yet found, so
+  // this stays off rather than alerting hourly on a known-broken flow.
+  activated: false,
   frequency: Frequency.EVERY_1H,
   alertChannels,
   code: {

@@ -255,7 +255,12 @@ export default function Home() {
             <Reveal delay={60} className="mt-8">
               <RoiCalculator />
             </Reveal>
-            <div className={`mt-10 items-start gap-5 ${PLANS.length === 1 ? "mx-auto max-w-sm" : "grid sm:grid-cols-3"}`}>
+            {/* The plan card and the "how busy are you?" slider sit side by side.
+                The card raises the question the slider answers — "is 500 minutes
+                enough for me?" — so stacking them buried the answer below the
+                fold. With more than one plan the cards take the row and the
+                slider spans underneath instead. */}
+            <div className={`mt-10 grid items-start gap-5 ${PLANS.length === 1 ? "mx-auto max-w-4xl md:grid-cols-2" : "sm:grid-cols-3"}`}>
               {PLANS.map((p, i) => (
                 <Reveal
                   key={p.id}
@@ -284,11 +289,11 @@ export default function Home() {
                   <Link href="/login" className={`mt-6 ${p.popular ? "btn-accent" : "btn-secondary"}`}>Get started</Link>
                 </Reveal>
               ))}
+              <Reveal delay={110} className={PLANS.length === 1 ? "" : "mx-auto max-w-sm sm:col-span-3"}>
+                <PlanFit />
+              </Reveal>
             </div>
-            <Reveal delay={110} className="mx-auto mt-6 max-w-sm">
-              <PlanFit />
-            </Reveal>
-            <Reveal delay={150} className="mx-auto mt-6 max-w-sm text-center">
+            <Reveal delay={150} className="mx-auto mt-6 max-w-2xl text-center">
               <p className="text-sm text-slate-600">
                 About what you&apos;d spend on <span className="font-semibold text-slate-900">a few coffees a week</span> — versus{" "}
                 <span className="font-semibold text-slate-900">$3,000+/mo</span> for a front-desk hire who still clocks out at 5.

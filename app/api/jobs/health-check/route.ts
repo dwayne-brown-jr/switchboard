@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyQStash } from "@/lib/qstash";
 import { detectSilentShops } from "@/lib/health";
 import { reportError } from "@/lib/observability";
+import { pingHeartbeat } from "@/lib/heartbeat";
 
 // QStash daily cron: proactive voice-path health check. Pages admins when a live
 // shop that was receiving calls suddenly goes silent (likely broken routing).
@@ -11,6 +12,8 @@ export async function POST(req: Request) {
   if (!(await verifyQStash(req, body))) return NextResponse.json({ error: "bad signature" }, { status: 401 });
   try {
     const res = await detectSilentShops();
+    // Success only — a thrown job must NOT ping; the missed beat is the alert.
+    await pingHeartbeat("health-check");
     return NextResponse.json({ ok: true, ...res });
   } catch (e) {
     await reportError(e, { source: "job", route: "jobs/health-check" });

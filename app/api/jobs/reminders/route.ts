@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyQStash } from "@/lib/qstash";
 import { sendDunningReminders, sendAbandonmentNudges } from "@/lib/reminders";
 import { reportError } from "@/lib/observability";
+import { pingHeartbeat } from "@/lib/heartbeat";
 
 // QStash daily cron: escalating past-due dunning reminders + one-time nudges to
 // owners who stalled mid-onboarding. Schedule via QStash, e.g. cron "0 16 * * *"
@@ -11,6 +12,8 @@ export async function POST(req: Request) {
   if (!(await verifyQStash(req, body))) return NextResponse.json({ error: "bad signature" }, { status: 401 });
   try {
     const [dunning, nudges] = await Promise.all([sendDunningReminders(), sendAbandonmentNudges()]);
+    // Success only — a thrown job must NOT ping; the missed beat is the alert.
+    await pingHeartbeat("reminders");
     return NextResponse.json({ ok: true, dunning, nudges });
   } catch (e) {
     await reportError(e, { source: "job", route: "jobs/reminders" });

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDemoLoginEnabled } from "@/lib/demo-login";
-import { signInDemo } from "./actions";
 
 export const metadata = {
   title: "Reviewer demo — Switchboard",
@@ -43,7 +42,10 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
             review — no real customers or calls.
           </p>
 
-          <form action={signInDemo} className="mt-5">
+          {/* Posts to a route handler, not a Server Action — see the note in
+              enter/route.ts. A Server Action's redirect is resolved server-side,
+              which consumed the magic-link token before the browser ever saw it. */}
+          <form action="/demo/enter" method="post" className="mt-5">
             <label htmlFor="code" className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Access code
             </label>

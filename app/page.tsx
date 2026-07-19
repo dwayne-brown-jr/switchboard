@@ -340,6 +340,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link href="/terms" className="hover:text-slate-800">Terms</Link>
             <Link href="/privacy" className="hover:text-slate-800">Privacy</Link>
+            <Link href="/sms-opt-in" className="hover:text-slate-800">Text alerts</Link>
             <span>© {new Date().getFullYear()} Switchboard</span>
           </div>
         </div>

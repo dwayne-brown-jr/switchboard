@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyQStash } from "@/lib/qstash";
 import { reclaimCanceledNumbers } from "@/lib/lifecycle";
 import { reportError } from "@/lib/observability";
+import { pingHeartbeat } from "@/lib/heartbeat";
 
 // QStash daily cron: permanently release the Twilio numbers of shops that have
 // stayed canceled past the grace window (CANCEL_GRACE_DAYS), so churned shops
@@ -12,6 +13,8 @@ export async function POST(req: Request) {
   if (!(await verifyQStash(req, body))) return NextResponse.json({ error: "bad signature" }, { status: 401 });
   try {
     const res = await reclaimCanceledNumbers();
+    // Success only — a thrown job must NOT ping; the missed beat is the alert.
+    await pingHeartbeat("reclaim-numbers");
     return NextResponse.json({ ok: true, ...res });
   } catch (e) {
     await reportError(e, { source: "job", route: "jobs/reclaim-numbers" });

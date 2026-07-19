@@ -50,3 +50,6 @@ prisma/dev.db*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Checkly (monitoring-as-code)
+.checkly/

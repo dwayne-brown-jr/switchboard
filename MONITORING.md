@@ -79,6 +79,13 @@ Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
 | `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
 | Browser check | ✅ **active** — signs in at `/demo` and asserts the dashboard renders |
 
+> This check earned its keep immediately: its first real run exposed a broken
+> demo sign-in. A Server Action redirected to better-auth's magic-link URL, and
+> Next resolves Server Action redirect destinations *server-side* — so the
+> framework consumed the single-use token and the session cookie never reached
+> the browser. Fixed in `app/demo/enter/route.ts`. Never redirect from a Server
+> Action to a single-use, side-effecting URL.
+
 The other five heartbeats show no data until their first scheduled run (daily
 jobs within 24h, the weekly digest by next Monday). Their grace periods are long
 enough that this is expected, not a fault.

@@ -5,6 +5,7 @@ import { defaultVoiceProvider } from "../integrations/voice";
 import { searchAndBuyNumber, attachNumberToTrunk, configureNumberSmsWebhook } from "../integrations/twilio";
 import { importPhoneNumber } from "../integrations/retell";
 import { agentFunctions, agentWebhookUrl, agentBaseUrl } from "../integrations/agentTools";
+import { isPublicDemoShop } from "../public-demo";
 import type { ShopConfig } from "../schemas";
 import { type AutoHandler, done, failed } from "./types";
 
@@ -60,7 +61,14 @@ export const provisionVoiceHandler: AutoHandler = async ({ shop }) => {
     webhookUrl: publicApp ? (agentWebhookUrl(shop.id) ?? "") : "",
     // Live handoff target: the owner's mobile (a real human, and a line that is
     // NOT forwarded to the agent — so a transfer can't loop back).
-    transferNumber: shop.ownerMobile ?? undefined,
+    //
+    // Never on the public demo shop. Its agent is reachable from the number
+    // printed on the landing page, so a transfer tool there would let any
+    // visitor ask for "a person" and be connected to the owner's personal
+    // phone. Clearing ownerMobile would fix that too, but it doubles as the
+    // notify_owner destination and the emergency alert number — so the guard
+    // belongs here, on the one thing that is actually unsafe in public.
+    transferNumber: isPublicDemoShop(shop.id) ? undefined : (shop.ownerMobile ?? undefined),
   });
 
   await prisma.shop.update({ where: { id: shop.id }, data: { agentProvider: provider.name, agentId } });

@@ -29,7 +29,12 @@ export function PlanFit() {
   const base = TIERS[0];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    // h-full so this matches the height of the plan card it sits beside, rather
+    // than each column sizing to its own content. Flex column + mt-auto on the
+    // footnote keeps that note pinned to the bottom instead of leaving a gap
+    // under it — and it stops the card resizing as the slider moves between
+    // verdicts of different lengths.
+    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-baseline justify-between gap-4">
         <label htmlFor="callsPerDay" className="text-sm font-semibold text-slate-900">
           How many calls do you get a day?
@@ -97,7 +102,7 @@ export function PlanFit() {
         )}
       </div>
 
-      <p className="mt-3 text-center text-xs text-slate-400">
+      <p className="mt-auto pt-3 text-center text-xs text-slate-400">
         There&apos;s only one plan to choose. Busier months are handled for you.
       </p>
     </div>

@@ -4,6 +4,12 @@ import { reportError } from "./observability";
 import { notifyAdmins } from "./notify";
 import { DEMO_SHOP_ID } from "./demo-login";
 import { SILENT_DAYS, classifyCallPath, type CallPathStatus } from "./call-path";
+import {
+  ERROR_WINDOW_MINUTES,
+  classifyErrorFeed,
+  errorAlertThreshold,
+  type ErrorFeedStatus,
+} from "./error-feed";
 
 // Proactive voice-path health check. A live shop whose Twilio number silently
 // stops routing (SIP trunk issue, unbound number, carrier problem) would take
@@ -47,6 +53,24 @@ export async function callPathStatus(): Promise<CallPathStatus> {
   }
 
   return classifyCallPath(live, lastCallByShop, Date.now());
+}
+
+/** Read-only view of the failure feed for external monitoring
+ *  (/api/health/errors).
+ *
+ *  Counts only — never routes or messages. This is a public endpoint and error
+ *  messages routinely carry shop names, phone numbers and vendor ids. The count
+ *  is enough to say "go look"; the detail stays behind the admin surface. */
+export async function errorFeedStatus(): Promise<ErrorFeedStatus> {
+  const since = new Date(Date.now() - ERROR_WINDOW_MINUTES * 60_000);
+  const rows = await prisma.failureEvent.groupBy({
+    by: ["level"],
+    where: { createdAt: { gte: since } },
+    _count: true,
+  });
+
+  const count = (level: string) => rows.find((r) => r.level === level)?._count ?? 0;
+  return classifyErrorFeed({ errors: count("error"), warns: count("warn") }, errorAlertThreshold());
 }
 
 /** Flag live shops that had call history and then went silent for SILENT_DAYS —

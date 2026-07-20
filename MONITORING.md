@@ -151,6 +151,70 @@ credentials double as reviewer access for pilot prospects.
 
 ---
 
+## Runbook — an alert just arrived
+
+Day to day there is nothing to do. Checks run on their own and you only hear
+from Checkly when something breaks or recovers.
+
+### Triage by which check fired
+
+| Alert | What it means | First move |
+|---|---|---|
+| **Health — app + Turso** | App or database is down. Everything else is downstream of this. | Vercel and Turso status pages. Don't chase other alerts until this one clears. |
+| **Voice path** | A live shop went silent past the window, or is live but can't answer. | Call that shop's number yourself. Nothing beats hearing it ring. |
+| **Error feed** | Errors crossed the threshold in the last hour. | Query `FailureEvent` by `route` — the count is the alarm, the table is the detail. |
+| **Landing page** | A deploy broke the site, or React shipped an error shell. | Roll back in Vercel, then diagnose. |
+| **Dashboard sign-in** | Auth, session, or dashboard rendering is broken. | Try `/demo` by hand — the failure is usually visible in one attempt. |
+| **Webhook reachable** | A route stopped being routable, or started accepting `GET`. | Almost always a deploy or middleware change. |
+| **A2P opt-in page** | The page carriers read during campaign review is down. | Fix urgently if a campaign is under review; a 404 mid-review can fail it. |
+| **Cron heartbeat missed** | A job didn't run, or threw before it could ping. | QStash delivery log first, then Vercel function logs for that route. |
+
+Recovery emails are enabled, so a blip that heals itself tells you it healed.
+Two alerts arriving together usually means one cause — start at the top of this
+table, not with whichever email you opened first.
+
+### Changing a check
+
+Checks are code. **Never edit them in the Checkly UI** — the next `deploy`
+silently overwrites your change, which is worse than it not working at all.
+
+```bash
+# edit __checks__/…
+npx checkly test                    # dry run against production, deploys nothing
+npx checkly test --grep "Voice"     # just one
+npx checkly deploy                  # make it live
+```
+
+### Commands worth remembering
+
+```bash
+npx checkly checks list                            # everything, with status
+npx checkly checks get <id>                        # detail + recent failure groups
+npx checkly checks get <id> --error-group <id>     # why it actually failed
+npx checkly trigger --tags voice                   # run a DEPLOYED check right now
+```
+
+**`test` vs `trigger` is the distinction that matters.** `test` runs your *local*
+files with your *local* env vars. `trigger` runs the *deployed* check with
+*Checkly's* stored secrets. When something passes locally but fails deployed,
+that gap is almost always the reason — it is how we established the demo-code
+wiring was fine and the app itself was broken.
+
+### Three things that will bite you
+
+1. **The run budget is a hard cap, and it fails silently.** When it is exhausted
+   checks simply stop running — you get no alert about losing alerting. Do the
+   arithmetic above before changing any frequency.
+2. **`DEMO_LOGIN_CODE` lives in two places** — Vercel and Checkly. Rotate both or
+   the browser check fails on sign-in.
+3. **Warns never page you.** `sweep:stuck` and `health:silent` come from the
+   daily cron's own email, not from Checkly.
+
+The web dashboard at <https://app.checklyhq.com> is worth opening for failure
+screenshots and response-time history, which the CLI does not show well.
+
+---
+
 ## First-time setup
 
 ### 1. Authenticate the CLI

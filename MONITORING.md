@@ -16,10 +16,11 @@ before a customer does.
 |---|---|---|
 | **Health — app + Turso** (`__checks__/api/critical.check.ts`) | App serving **and** the database is reachable. Asserts `status:"ok"` and `db:"ok"`, not just HTTP 200. | 10 min |
 | **Voice path** (`__checks__/api/critical.check.ts`) | The *product* still works: no live shop has gone silent past the window, and none is live-but-unanswerable (missing number or agent version). | 1 hour |
+| **Error feed** (`__checks__/api/critical.check.ts`) | Nothing unexpected is throwing. The only check that catches failures nobody predicted — see below. | 1 hour |
 | **Landing page** | Top of funnel renders — asserts the hero headline is actually in the HTML, so an error shell fails. | 30 min |
 | **Retell `call-events` reachable** (`__checks__/api/webhooks.check.ts`) | The call webhook route exists. Sends `GET` and expects **405** — see "why 405" below. | 1 hour |
 | **A2P opt-in page** | `/sms-opt-in` is up and still contains the exact consent sentence carriers review. | 1 hour |
-| **Dashboard sign-in flow** (`__checks__/browser/`) | Playwright: sign in via `/demo`, land on `/app`, confirm call history and booking metrics render. ⚠️ *deactivated — see below* | 1 hour |
+| **Dashboard sign-in flow** (`__checks__/browser/`) | Playwright: sign in via `/demo`, land on `/app`, confirm call history and booking metrics render. | 1 hour |
 | **6 cron heartbeats** (`__checks__/heartbeat/crons.check.ts`) | Each scheduled job actually completed. Passive — the job pings Checkly. | per schedule |
 
 ### Why webhook checks assert 405, not 200
@@ -53,6 +54,30 @@ The reviewer demo shop is excluded everywhere (`DEMO_SHOP_ID`) — its calls are
 mock data frozen at seed time, so it reads as a silent live shop a few days
 after every seed.
 
+### Why the error-feed check is the highest-value one here
+
+Every other check asks a question we thought to ask in advance: is the app up,
+is the database reachable, can someone sign in, is the phone ringing. Each one
+covers exactly the failure it was written for.
+
+The error feed covers the rest. `reportError()` has always written every failure
+to `FailureEvent` — nothing ever read it. Now a handler that starts throwing for
+a reason nobody predicted surfaces within the hour.
+
+**Tuning.** The threshold is sized from measured production data: the baseline
+was **2 errors across seven days**, so three in a single hour is a real spike.
+That only holds while traffic is low. Raise `ERROR_ALERT_THRESHOLD` as call
+volume grows, or this becomes the alert everyone learns to ignore — which is
+worse than not having it.
+
+**Warns never alert.** The two that actually occur, `sweep:stuck` and
+`health:silent`, are routine operational signals with their own dedicated
+alerting. Paging on them here would be duplicate noise for something already
+handled.
+
+The endpoint returns **counts only** — never routes or messages. It is public,
+and error text routinely carries shop names, phone numbers and vendor ids.
+
 ### What is deliberately NOT monitored
 - **Vendor APIs** (Retell, Twilio, Stripe, Anthropic). A third-party blip would
   page us for something we can't fix, and polling paid APIs every few minutes
@@ -79,7 +104,7 @@ every 30m = 1,440
 every 60m =   720
 ```
 
-**Current spend: 7,920 / 10,000 API runs · 720 / 1,000 browser runs.**
+**Current spend: 8,640 / 10,000 API runs · 720 / 1,000 browser runs.**
 
 **One location (`us-west-1`) on purpose.** Locations multiply run count.
 us-west-1 is closest to our California customers and to the Vercel region.
@@ -91,11 +116,11 @@ upgrading to Starter ($24/mo, 25k API runs), then update `checkly.config.ts`.
 ## Current status (deployed)
 
 Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
-`dwaynebrown2012@gmail.com`; all 11 checks are subscribed.
+`dwaynebrown2012@gmail.com`; all 13 checks are subscribed.
 
 | | State |
 |---|---|
-| 4 API checks | ✅ passing |
+| 6 API checks | ✅ passing |
 | 6 cron heartbeats | ✅ created, ping URLs wired into Vercel |
 | `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
 | Browser check | ✅ **active** — signs in at `/demo` and asserts the dashboard renders |

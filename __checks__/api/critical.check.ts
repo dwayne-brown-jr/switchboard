@@ -92,6 +92,42 @@ new ApiCheck("health-call-path", {
 });
 
 /**
+ * The only check that catches failures nobody predicted.
+ *
+ * Every other check here asks a question we thought to ask in advance. This one
+ * watches our own failure feed, so a handler that starts throwing for a reason
+ * none of us imagined still surfaces. reportError() has always written to
+ * FailureEvent; until now nothing read it.
+ *
+ * Threshold is sized from measured production data: the baseline was 2 errors
+ * across seven days, so three in one hour is a real spike. Raise
+ * ERROR_ALERT_THRESHOLD as call volume grows, or this becomes the alert that
+ * gets ignored.
+ *
+ * Hourly, matching the endpoint's 60-minute window so coverage is continuous
+ * with no gap between runs. Budget: 720 runs/month → 8,640 of 10,000.
+ */
+new ApiCheck("health-error-feed", {
+  name: "Error feed — nothing unexpected is throwing",
+  tags: ["critical", "errors"],
+  frequency: Frequency.EVERY_1H,
+  degradedResponseTime: DEGRADED_MS,
+  maxResponseTime: MAX_MS,
+  alertChannels,
+  request: {
+    url: `${BASE}/api/health/errors`,
+    method: "GET",
+    followRedirects: false,
+    assertions: [
+      AssertionBuilder.statusCode().equals(200),
+      // "degraded" means error-level events crossed the threshold in the last
+      // hour. Warns never trip it — they have their own alerting.
+      AssertionBuilder.jsonBody("$.status").equals("ok"),
+    ],
+  },
+});
+
+/**
  * The landing page is the entire top of funnel: the demo call, the ROI
  * calculator and the pricing all live here. A 500 here costs signups directly.
  */

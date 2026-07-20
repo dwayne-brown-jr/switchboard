@@ -260,7 +260,7 @@ export default function Home() {
                 enough for me?" — so stacking them buried the answer below the
                 fold. With more than one plan the cards take the row and the
                 slider spans underneath instead. */}
-            <div className={`mt-10 grid items-start gap-5 ${PLANS.length === 1 ? "mx-auto max-w-4xl md:grid-cols-2" : "sm:grid-cols-3"}`}>
+            <div className={`mt-10 grid items-stretch gap-5 ${PLANS.length === 1 ? "mx-auto max-w-4xl md:grid-cols-2" : "sm:grid-cols-3"}`}>
               {PLANS.map((p, i) => (
                 <Reveal
                   key={p.id}
@@ -289,7 +289,7 @@ export default function Home() {
                   <Link href="/login" className={`mt-6 ${p.popular ? "btn-accent" : "btn-secondary"}`}>Get started</Link>
                 </Reveal>
               ))}
-              <Reveal delay={110} className={PLANS.length === 1 ? "" : "mx-auto max-w-sm sm:col-span-3"}>
+              <Reveal delay={110} className={PLANS.length === 1 ? "h-full" : "mx-auto max-w-sm sm:col-span-3"}>
                 <PlanFit />
               </Reveal>
             </div>

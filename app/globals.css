@@ -68,9 +68,12 @@ body {
 
 /* ---------- Landing-page aesthetic layer ---------- */
 
+/* Headlines are the body family at display weights — see app/layout.tsx for why.
+   The class stays so every heading has one place to change, and so the tighter
+   display tracking below is not repeated across dozens of call sites. */
 .font-display {
-  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
-  letter-spacing: -0.02em;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: -0.025em;
 }
 
 /* Warm→cool gradient text for headline highlights. */

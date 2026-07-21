@@ -9,6 +9,7 @@ import { TrustBand } from "@/components/trust-band";
 import { Reveal } from "@/components/reveal";
 import { ScrollLink } from "@/components/scroll-link";
 import { DEMO_TYPES, demoAgentEnvKey } from "@/lib/demo";
+import { Logo } from "@/components/logo";
 
 // --- tiny inline icon set (Lucide-style, currentColor stroke) ---------------
 const svg = (children: ReactNode) => (
@@ -81,7 +82,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-2.5 font-display text-lg font-bold text-slate-900">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-sm">S</span>
+            <Logo className="h-8 w-8 shadow-sm" />
             Switchboard
           </div>
           <nav className="flex items-center gap-1">
@@ -344,7 +345,7 @@ export default function Home() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-10 text-sm text-slate-500 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2 font-display font-bold text-slate-700">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-xs text-white">S</span>
+            <Logo className="h-7 w-7" />
             Switchboard
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">

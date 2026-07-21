@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { LoginForm } from "./login-form";
+import { Logo } from "@/components/logo";
 
 export default async function LoginPage() {
   const session = await getSession();
@@ -11,7 +12,7 @@ export default async function LoginPage() {
     <div className="grid min-h-screen place-items-center px-6">
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2 font-semibold text-slate-900">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-white">S</span>
+          <Logo className="h-8 w-8" />
           Switchboard
         </Link>
         {/* Reached from "Get started" as often as from "Sign in", and with

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Logo } from "@/components/logo";
 
 export const metadata = { title: "Terms of Service — Switchboard" };
 
@@ -9,7 +10,7 @@ function LegalShell({ title, updated, children }: { title: string; updated: stri
       <header className="border-b border-slate-200 bg-white/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3.5">
           <Link href="/" className="flex items-center gap-2 font-display font-bold text-slate-900">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">S</span>
+            <Logo className="h-8 w-8" />
             Switchboard
           </Link>
           <Link href="/" className="btn-ghost">Home</Link>

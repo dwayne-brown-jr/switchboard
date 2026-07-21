@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isDemoLoginEnabled } from "@/lib/demo-login";
+import { Logo } from "@/components/logo";
 
 export const metadata = {
   title: "Reviewer demo — Switchboard",
@@ -31,7 +32,7 @@ export default async function DemoPage({ searchParams }: { searchParams: Promise
     <div className="grid min-h-full place-items-center bg-slate-50 px-6 py-20">
       <div className="w-full max-w-sm">
         <Link href="/" className="flex items-center justify-center gap-2 font-display font-bold text-slate-900">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">S</span>
+          <Logo className="h-8 w-8" />
           Switchboard
         </Link>
 

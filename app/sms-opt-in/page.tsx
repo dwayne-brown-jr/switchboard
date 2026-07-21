@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 
 export const metadata = {
   title: "Text message program (Switchboard Alerts) — Switchboard",
@@ -24,7 +25,7 @@ export default function SmsOptIn() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3.5">
           <Link href="/" className="flex items-center gap-2 font-display font-bold text-slate-900">
-            <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white">S</span>
+            <Logo className="h-8 w-8" />
             Switchboard
           </Link>
           <Link href="/" className="btn-ghost">Home</Link>

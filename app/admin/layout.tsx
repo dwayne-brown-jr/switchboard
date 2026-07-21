@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/session";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Logo } from "@/components/logo";
 
 // Double-gated (ADMIN_EMAILS env allowlist OR User.isAdmin) via requireAdmin.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-4">
             <Link href="/admin" className="flex items-center gap-2 font-semibold">
-              <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand-500 text-sm text-white">S</span>
+              <Logo className="h-7 w-7" />
               Switchboard <span className="text-slate-400">Operator</span>
             </Link>
           </div>

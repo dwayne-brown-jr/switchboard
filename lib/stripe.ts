@@ -6,7 +6,18 @@ const key = process.env.STRIPE_SECRET_KEY;
 
 // Single platform Stripe account. Null when unconfigured (dev) — callers guard
 // with hasStripe() and fall back to the dev "simulate subscription" path.
-export const stripe = key ? new Stripe(key) : null;
+//
+// apiVersion is pinned deliberately. Without it the SDK sends whatever version
+// it happens to ship with (stripe.core.js: `props.apiVersion || DEFAULT_API_VERSION`),
+// so bumping the `stripe` dependency — which package.json allows via ^22.3.0 —
+// would silently move us to a new API version and could change webhook payload
+// shapes or field names with no code change and no error.
+//
+// Pinned, that becomes loud instead of silent: an SDK upgrade that drops this
+// version fails typecheck at build time rather than surfacing as a billing bug
+// in production. When upgrading Stripe, change this line deliberately and read
+// their migration notes — do not just delete it to make the build pass.
+export const stripe = key ? new Stripe(key, { apiVersion: "2026-06-24.dahlia" }) : null;
 
 export function hasStripe(): boolean {
   return stripe !== null;

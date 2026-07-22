@@ -10,6 +10,7 @@ import {
   errorAlertThreshold,
   type ErrorFeedStatus,
 } from "./error-feed";
+import { capacityWarnPct, classifyCapacity, type CapacityStatus } from "./capacity";
 
 // Proactive voice-path health check. A live shop whose Twilio number silently
 // stops routing (SIP trunk issue, unbound number, carrier problem) would take
@@ -71,6 +72,33 @@ export async function errorFeedStatus(): Promise<ErrorFeedStatus> {
 
   const count = (level: string) => rows.find((r) => r.level === level)?._count ?? 0;
   return classifyErrorFeed({ errors: count("error"), warns: count("warn") }, errorAlertThreshold());
+}
+
+/** Voice-capacity headroom, for /api/health/capacity.
+ *
+ *  Deliberately short-timeout and failure-tolerant: a slow or broken Retell API
+ *  must resolve to "unknown", never to a page. We are monitoring OUR headroom
+ *  against a ceiling we can raise, not Retell's uptime. */
+export async function capacityStatus(): Promise<CapacityStatus> {
+  const key = process.env.RETELL_API_KEY;
+  if (!key) return classifyCapacity(null, capacityWarnPct());
+
+  try {
+    const res = await fetch("https://api.retellai.com/get-concurrency", {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(5_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return classifyCapacity(null, capacityWarnPct());
+    const body = (await res.json()) as { current_concurrency?: number; concurrency_limit?: number };
+    if (typeof body.concurrency_limit !== "number") return classifyCapacity(null, capacityWarnPct());
+    return classifyCapacity(
+      { used: body.current_concurrency ?? 0, limit: body.concurrency_limit },
+      capacityWarnPct(),
+    );
+  } catch {
+    return classifyCapacity(null, capacityWarnPct());
+  }
 }
 
 /** Flag live shops that had call history and then went silent for SILENT_DAYS —

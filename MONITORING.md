@@ -17,6 +17,7 @@ before a customer does.
 | **Health — app + Turso** (`__checks__/api/critical.check.ts`) | App serving **and** the database is reachable. Asserts `status:"ok"` and `db:"ok"`, not just HTTP 200. | 10 min |
 | **Voice path** (`__checks__/api/critical.check.ts`) | The *product* still works: no live shop has gone silent past the window, and none is live-but-unanswerable (missing number or agent version). | 1 hour |
 | **Error feed** (`__checks__/api/critical.check.ts`) | Nothing unexpected is throwing. The only check that catches failures nobody predicted — see below. | 1 hour |
+| **Voice capacity** (`__checks__/api/critical.check.ts`) | Headroom against Retell's concurrent-call ceiling (20 on this account). See the exception note below. | 2 hours |
 | **Landing page** | Top of funnel renders — asserts the hero headline is actually in the HTML, so an error shell fails. | 30 min |
 | **Retell `call-events` reachable** (`__checks__/api/webhooks.check.ts`) | The call webhook route exists. Sends `GET` and expects **405** — see "why 405" below. | 1 hour |
 | **A2P opt-in page** | `/sms-opt-in` is up and still contains the exact consent sentence carriers review. | 1 hour |
@@ -78,10 +79,37 @@ handled.
 The endpoint returns **counts only** — never routes or messages. It is public,
 and error text routinely carries shop names, phone numbers and vendor ids.
 
+### The one vendor-API exception, and why it isn't one
+
+The capacity check calls Retell, which looks like it breaks the rule below. It
+doesn't, because it asks a different question: **not "is Retell up" but "how
+close are we to our own ceiling"**.
+
+Retell caps concurrent calls at **20** on this account (burst 60, purchasable to
+180). Nothing tracked that, so the first sign of hitting it would have been
+callers reaching nothing — the exact failure the product exists to prevent. And
+unlike a vendor outage, it is fixable: raising the limit is a support ticket.
+
+So the endpoint returns three states, and only one alerts:
+
+| | |
+|---|---|
+| `ok` | headroom below the warn threshold (default 70%) |
+| `degraded` | near the ceiling — **alerts**, because we can act |
+| `unknown` | Retell unreachable — **does not alert**, because we can't |
+
+The check asserts status is *not* `degraded` rather than *is* `ok`, so a Retell
+outage passes. That is the whole distinction in one assertion.
+
+**Read a green result carefully:** concurrency is sampled instantaneously, so a
+two-hourly poll misses short spikes. It catches sustained saturation and a
+silently reduced limit, not a brief burst.
+
 ### What is deliberately NOT monitored
 - **Vendor APIs** (Retell, Twilio, Stripe, Anthropic). A third-party blip would
   page us for something we can't fix, and polling paid APIs every few minutes
-  costs money. We monitor *our* handling of them instead.
+  costs money. We monitor *our* handling of them instead — and the capacity
+  check above is about our headroom, not their uptime.
 - **Most individual routes.** The app is one Vercel deployment — routes ship
   atomically. If `/` and `/api/health` are up, the other routes exist. Per-route
   checks would burn the run budget to tell us what we already know.
@@ -104,7 +132,7 @@ every 30m = 1,440
 every 60m =   720
 ```
 
-**Current spend: 8,640 / 10,000 API runs · 720 / 1,000 browser runs.**
+**Current spend: 9,000 / 10,000 API runs · 720 / 1,000 browser runs.**
 
 **One location (`us-west-1`) on purpose.** Locations multiply run count.
 us-west-1 is closest to our California customers and to the Vercel region.
@@ -116,11 +144,11 @@ upgrading to Starter ($24/mo, 25k API runs), then update `checkly.config.ts`.
 ## Current status (deployed)
 
 Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
-`dwaynebrown2012@gmail.com`; all 13 checks are subscribed.
+`dwaynebrown2012@gmail.com`; all 14 checks are subscribed.
 
 | | State |
 |---|---|
-| 6 API checks | ✅ passing |
+| 7 API checks | ✅ passing |
 | 6 cron heartbeats | ✅ created, ping URLs wired into Vercel |
 | `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
 | Browser check | ✅ **active** — signs in at `/demo` and asserts the dashboard renders |

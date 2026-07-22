@@ -162,7 +162,7 @@ export default function Home() {
             </Reveal>
             <ol className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {steps.map((s, i) => (
-                <Reveal as="li" key={s.n} delay={i * 90} className="group relative rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-accent-200 hover:shadow-lg hover:shadow-accent-500/5">
+                <Reveal as="li" key={s.n} delay={i * 90} className="glow-ring group relative rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1">
                   <span className="font-display text-3xl font-extrabold text-slate-200 transition group-hover:text-accent-400">{s.n}</span>
                   <h3 className="mt-3 text-base font-semibold text-slate-900">{s.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{s.body}</p>
@@ -181,7 +181,7 @@ export default function Home() {
             </Reveal>
             <div className="mt-10 grid gap-5 sm:grid-cols-3">
               {features.map((f, i) => (
-                <Reveal key={f.title} delay={i * 90} className="group rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-500/5">
+                <Reveal key={f.title} delay={i * 90} className="glow-ring group rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1">
                   <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100 transition group-hover:bg-accent-50 group-hover:text-accent-600 group-hover:ring-accent-100">
                     {icons[f.icon]}
                   </span>
@@ -266,7 +266,7 @@ export default function Home() {
                 <Reveal
                   key={p.id}
                   delay={i * 90}
-                  className={`relative flex flex-col rounded-2xl border bg-white p-6 transition duration-300 hover:-translate-y-1 ${
+                  className={`glow-ring relative flex flex-col rounded-2xl border bg-white p-6 transition duration-300 hover:-translate-y-1 ${
                     p.popular ? "border-accent-300 shadow-xl shadow-accent-500/10" : "border-slate-200 hover:shadow-lg"
                   }`}
                 >

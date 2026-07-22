@@ -84,6 +84,70 @@ body {
   color: transparent;
 }
 
+/* Gradient glow + ring on hover.
+ *
+ * Two effects: a crisp gradient ring on the card's edge (::before, masked) and
+ * a soft coloured halo outside it (box-shadow — see the note on why it is not a
+ * pseudo-element).
+ *
+ * Colours are the site's existing warm→cool signature (.text-gradient, .mesh),
+ * with a light blue in the middle so the sweep reads as multi-colour rather
+ * than a two-tone fade.
+ *
+ * Also triggers on :focus-within, so keyboard users get the same affordance as
+ * a mouse — these cards usually wrap a link or a button.
+ */
+.glow-ring {
+  position: relative;
+}
+
+/* The ring: a gradient border drawn with a mask, so only the 1.5px edge paints
+   and the middle stays transparent over the card's content. */
+.glow-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(120deg, #f97316 0%, #fb923c 28%, #598bff 68%, #3563eb 100%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* The halo is a box-shadow, NOT a blurred pseudo-element.
+ *
+ * The obvious approach — an inset:-4px blurred gradient layer at z-index:-1 —
+ * is wrong, and wrong in a way that looks fine in the CSS and broken on screen.
+ * A negative z-index child paints AFTER its parent's own background, not
+ * behind it, so the blurred gradient washed straight across the white card
+ * interior and sat under the text.
+ *
+ * box-shadow paints strictly outside the border box, so there is nothing to
+ * bleed. Two offset shadows, warm from the left and cool from the right, echo
+ * the ring's gradient direction closely enough to read as one effect. */
+.glow-ring:hover,
+.glow-ring:focus-within {
+  box-shadow:
+    -10px 2px 26px -8px rgba(249, 115, 22, 0.5),
+    10px 2px 26px -8px rgba(53, 99, 235, 0.5),
+    0 10px 30px -12px rgba(89, 139, 255, 0.45);
+}
+
+.glow-ring:hover::before,
+.glow-ring:focus-within::before {
+  opacity: 1;
+}
+
 /* Layered gradient-mesh atmosphere behind the hero + CTA. */
 .mesh {
   background:
@@ -186,6 +250,12 @@ body {
   .ping-ring::after,
   .eq-bar {
     animation: none;
+  }
+  /* Keep the glow — it's a hover affordance, not decoration — but land it
+     instantly rather than fading. */
+  .glow-ring,
+  .glow-ring::before {
+    transition: none;
   }
   .rise {
     opacity: 1;

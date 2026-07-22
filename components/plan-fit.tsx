@@ -34,7 +34,7 @@ export function PlanFit() {
     // footnote keeps that note pinned to the bottom instead of leaving a gap
     // under it — and it stops the card resizing as the slider moves between
     // verdicts of different lengths.
-    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <div className="glow-ring flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-baseline justify-between gap-4">
         <label htmlFor="callsPerDay" className="text-sm font-semibold text-slate-900">
           How many calls do you get a day?

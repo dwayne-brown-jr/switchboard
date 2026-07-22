@@ -15,8 +15,21 @@ export async function POST(req: Request) {
 
   // This is the core call-logging path — a throw here would silently lose the
   // record. Capture + return 500 so Retell retries (recordCall is idempotent).
+  //
+  // The body is read OUTSIDE the try so the call id survives into the catch.
+  // Retries eventually stop, and without the id a permanently-failed call
+  // vanished with no trace of which call it was — leaving no way to notice or
+  // recover it. With the id recorded, the call can be re-fetched from Retell
+  // and re-ingested by hand.
+  //
+  // Deliberately only the id, never the payload: Retell already holds the call,
+  // and copying transcripts into the error feed would spread caller PII into a
+  // second place for no extra recovery ability.
+  const body = await req.json().catch(() => ({}));
+  const envelope = ((body as Record<string, unknown>)?.call ?? body) as Record<string, unknown>;
+  const callId = typeof envelope?.call_id === "string" ? envelope.call_id : null;
+
   try {
-    const body = await req.json().catch(() => ({}));
     const version = await prisma.agentVersion.findFirst({
       where: { shopId: shop.id, status: { in: ["live", "approved"] } },
       orderBy: { createdAt: "desc" },
@@ -32,7 +45,15 @@ export async function POST(req: Request) {
     await recordCall(shop, parsed.data);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    await reportError(e, { source: "webhook", route: "agent/call-events", shopId: shop.id });
+    // callId + replayable make a lost call findable in the failure feed:
+    //   SELECT * FROM FailureEvent WHERE route = 'agent/call-events'
+    // then re-fetch each id from Retell's get-call and re-post it here.
+    await reportError(e, {
+      source: "webhook",
+      route: "agent/call-events",
+      shopId: shop.id,
+      extra: { callId, replayable: Boolean(callId) },
+    });
     return NextResponse.json({ error: "record failed" }, { status: 500 });
   }
 }

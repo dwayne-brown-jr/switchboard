@@ -18,9 +18,7 @@
 // Local dev.db only. Never point this at production — it writes real bookings.
 
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { stressPrisma } from "./_stress-db.mjs";
 
 const CONCURRENCY = Number(process.argv[2] ?? 10);
 const BASE = process.argv[3] ?? "http://localhost:3100";
@@ -30,19 +28,11 @@ if (!/localhost|127\.0\.0\.1/.test(BASE)) {
   throw new Error(`refusing to run against ${BASE} — this writes real bookings`);
 }
 
-for (const line of readFileSync(new URL("../.env", import.meta.url), "utf8").split("\n")) {
-  if (!line || line.startsWith("#")) continue;
-  const i = line.indexOf("=");
-  if (i < 0) continue;
-  const k = line.slice(0, i).trim();
-  const v = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
-  if (!process.env[k]) process.env[k] = v;
-}
 
 const secret = process.env.AUTH_SECRET || "dev-insecure-secret";
 const token = crypto.createHmac("sha256", secret).update(`agent:${SHOP_ID}`).digest("hex").slice(0, 32);
 
-const prisma = new PrismaClient({ adapter: new PrismaLibSQL({ url: "file:./prisma/dev.db" }) });
+const { prisma, target } = stressPrisma();
 
 // Next weekday at 10:00 shop-local — inside the seeded 08:00–17:00 hours, and
 // far enough ahead that "in the past" can't be the reason a booking is refused.
@@ -57,7 +47,8 @@ function nextWeekdayAt10() {
 }
 
 const slot = nextWeekdayAt10();
-console.log(`\n  slot:        ${slot} (shop local)`);
+console.log(`\n  database:    ${target}`);
+console.log(`  slot:        ${slot} (shop local)`);
 console.log(`  concurrency: ${CONCURRENCY}`);
 
 // Clean slate so a previous run can't be mistaken for a race.

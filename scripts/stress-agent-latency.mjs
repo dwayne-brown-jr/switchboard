@@ -14,7 +14,7 @@
 // Read-only: check-availability writes nothing and notifies nobody.
 
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
+import { loadEnv } from "./_stress-db.mjs";
 
 const CONCURRENCY = Number(process.argv[2] ?? 10);
 const ROUNDS = Number(process.argv[3] ?? 3);
@@ -23,14 +23,7 @@ const SHOP_ID = "demo_reviewer_shop";
 
 if (!/localhost|127\.0\.0\.1/.test(BASE)) throw new Error(`refusing to run against ${BASE}`);
 
-for (const line of readFileSync(new URL("../.env", import.meta.url), "utf8").split("\n")) {
-  if (!line || line.startsWith("#")) continue;
-  const i = line.indexOf("=");
-  if (i < 0) continue;
-  const k = line.slice(0, i).trim();
-  const v = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
-  if (!process.env[k]) process.env[k] = v;
-}
+loadEnv();
 
 const secret = process.env.AUTH_SECRET || "dev-insecure-secret";
 const token = crypto.createHmac("sha256", secret).update(`agent:${SHOP_ID}`).digest("hex").slice(0, 32);

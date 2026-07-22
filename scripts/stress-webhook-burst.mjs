@@ -16,9 +16,7 @@
 // Local only. Cleans up the records it creates.
 
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
-import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { stressPrisma } from "./_stress-db.mjs";
 
 const COUNT = Number(process.argv[2] ?? 50);
 const BASE = process.argv[3] ?? "http://localhost:3100";
@@ -27,19 +25,11 @@ const TAG = `stress_${Date.now()}`;
 
 if (!/localhost|127\.0\.0\.1/.test(BASE)) throw new Error(`refusing to run against ${BASE}`);
 
-for (const line of readFileSync(new URL("../.env", import.meta.url), "utf8").split("\n")) {
-  if (!line || line.startsWith("#")) continue;
-  const i = line.indexOf("=");
-  if (i < 0) continue;
-  const k = line.slice(0, i).trim();
-  const v = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
-  if (!process.env[k]) process.env[k] = v;
-}
 
 const secret = process.env.AUTH_SECRET || "dev-insecure-secret";
 const token = crypto.createHmac("sha256", secret).update(`agent:${SHOP_ID}`).digest("hex").slice(0, 32);
 const url = `${BASE}/api/agent/call-events?client_id=${SHOP_ID}&token=${token}`;
-const prisma = new PrismaClient({ adapter: new PrismaLibSQL({ url: "file:./prisma/dev.db" }) });
+const { prisma, target } = stressPrisma();
 
 const payloads = Array.from({ length: COUNT }, (_, i) => ({
   call_id: `${TAG}_${i}`,
@@ -56,7 +46,8 @@ const post = (p) =>
     .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }))
     .catch((e) => ({ status: 0, body: { error: e.message } }));
 
-console.log(`\n  ${COUNT} concurrent call-ended webhooks → ${BASE}\n`);
+console.log(`\n  ${COUNT} concurrent call-ended webhooks → ${BASE}`);
+console.log(`  database: ${target}\n`);
 
 // --- phase 1: unique deliveries -------------------------------------------
 const t0 = Date.now();

@@ -6,6 +6,8 @@ import { MeetReceptionist } from "./meet-receptionist";
 import { SetupChecklist } from "./setup-checklist";
 import { Dashboard } from "./dashboard";
 import { getDashboardData, getRecentCalls, type Period } from "@/lib/stats";
+import { usageStatus } from "@/lib/usage";
+import { UsageMeter } from "./usage-meter";
 import { openBillingPortal } from "./subscribe/actions";
 
 export default async function AppHome({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
@@ -28,7 +30,11 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
   if (shop.status === "live" || shop.status === "paused") {
     const p = Number((await searchParams).period);
     const period: Period = p === 7 || p === 90 ? p : 30;
-    const [data, calls] = await Promise.all([getDashboardData(shop.id, period), getRecentCalls(shop.id)]);
+    const [data, calls, usage] = await Promise.all([
+      getDashboardData(shop.id, period),
+      getRecentCalls(shop.id),
+      usageStatus(shop),
+    ]);
     // Texting (a2p) is optional and doesn't block going live — surface it here so
     // a live owner can still finish registration to turn SMS on.
     const a2pStep = shop.run.steps.find((s) => s.key === "a2p");
@@ -61,6 +67,7 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
             </Link>
           </div>
         )}
+        <UsageMeter usage={usage} />
         <Dashboard shop={shop} data={data} calls={calls} period={period} />
       </div>
     );

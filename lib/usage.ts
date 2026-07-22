@@ -2,6 +2,7 @@ import "server-only";
 import type { Shop } from "@prisma/client";
 import { prisma } from "./db";
 import { plan, nextTier, type Plan } from "./plans";
+import { usageMeter } from "./usage-meter";
 import { stripe, PRICE_IDS, isPaying } from "./stripe";
 import { logAudit } from "./audit";
 import { notifyAdmins } from "./notify";
@@ -61,7 +62,16 @@ export interface UsageSweepResult {
   over: number;
   bumped: number;
   alerted: number;
+  /** Owners warned that they're nearing their included minutes. */
+  warned: number;
 }
+
+/** How long before the same shop can be warned again.
+ *
+ *  Once a cycle would be too little — a shop that sits at 85% for three weeks
+ *  should hear again before it crosses. Daily would be noise. Weekly is a
+ *  useful reminder that still respects the inbox. */
+const APPROACHING_REWARN_DAYS = 7;
 
 /** Scan live, paying shops and act on those over their included minutes:
  *  auto-bump to the next tier when enabled, otherwise alert the operator.
@@ -72,13 +82,23 @@ export async function sweepUsageOverages(): Promise<UsageSweepResult> {
     select: { id: true, plan: true, businessName: true, subStatus: true, stripeCustomerId: true, ownerId: true, owner: { select: { email: true } } },
   });
 
-  const res: UsageSweepResult = { scanned: shops.length, over: 0, bumped: 0, alerted: 0 };
+  const res: UsageSweepResult = { scanned: shops.length, over: 0, bumped: 0, alerted: 0, warned: 0 };
 
   for (const shop of shops) {
     try {
       if (!isPaying(shop.subStatus)) continue;
       const status = await usageStatus(shop);
-      if (!status.over) continue;
+
+      // Not over yet — but say something if they're close. The pricing page
+      // promises "we'd tell you before we do", and the dashboard meter alone
+      // only keeps that promise for an owner who happens to log in and look.
+      // This is the half that reaches the owner who doesn't.
+      if (!status.over) {
+        if (usageMeter(status.used, status.included).tone === "approaching") {
+          if (await warnApproaching(shop, status)) res.warned++;
+        }
+        continue;
+      }
       res.over++;
 
       if (autoBumpEnabled() && status.next) {
@@ -133,6 +153,60 @@ async function bumpToTier(shop: SweepShop, target: Plan): Promise<boolean> {
     }).catch((e) => console.error("autobump owner email failed", e));
   }
   await notifyAdmins("Usage auto-bump", `${shop.businessName} (${shop.id}) auto-scaled ${shop.plan} → ${target.id}.`).catch(() => {});
+  return true;
+}
+
+/** Tell the OWNER they're nearing their included minutes, before anything
+ *  changes on their bill.
+ *
+ *  This is the sentence on the pricing page — "we'd shift you to our higher
+ *  tier and tell you before we do" — actually being kept. The dashboard meter
+ *  shows the same thing, but only to an owner who logs in; a shop owner under a
+ *  truck for three weeks needs it to come to them.
+ *
+ *  The "approaching" test lives in usageMeter() and is called by the sweep, not
+ *  duplicated here, so the email and the dashboard can never disagree about
+ *  what counts as close.
+ *
+ *  Deduped through the FailureEvent feed, the same ledger alertOverage uses.
+ *  It's a notification rather than a failure, hence level "warn" — the
+ *  error-feed check only alerts on level "error", so this can't page anyone. */
+async function warnApproaching(shop: SweepShop, status: UsageStatus): Promise<boolean> {
+  if (!shop.owner?.email) return false;
+
+  const since = new Date(Date.now() - APPROACHING_REWARN_DAYS * 86_400_000);
+  const recent = await prisma.failureEvent.findFirst({
+    where: { route: "usage:approaching", shopId: shop.id, createdAt: { gte: since } },
+  });
+  if (recent) return false;
+
+  const remaining = Math.max(0, status.included - status.used);
+  const next = status.next
+    ? `If you do go past it, we'll move you to ${status.next.name} ($${status.next.price}/mo, ` +
+      `${status.next.includedMinutes.toLocaleString()} minutes) — there's nothing for you to pick, and you'll ` +
+      `never be charged an overage fee.`
+    : `If you do go past it, we'll get in touch to price your volume with you directly rather than let a bill ` +
+      `surprise you.`;
+
+  const line =
+    `Heads up — ${shop.businessName} has used ${status.used.toLocaleString()} of the ` +
+    `${status.included.toLocaleString()} talk-minutes included on your plan this cycle, so there are about ` +
+    `${remaining.toLocaleString()} left. Nothing has changed and nothing is wrong; this is just so it isn't a ` +
+    `surprise. ${next} You can see the running total any time on your dashboard.`;
+
+  await sendEmail({
+    to: shop.owner.email,
+    subject: `${shop.businessName}: you're nearing your included minutes`,
+    text: line,
+    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#0f172a;font-size:15px;line-height:1.6">${line}</div>`,
+  }).catch((e) => console.error("approaching-minutes owner email failed", e));
+
+  // Written last so a failed send doesn't silently consume the one warning
+  // they were going to get.
+  await reportError(
+    new Error(`Usage approaching plan limit: ${shop.businessName} (${shop.id}) ${status.used}/${status.included} min`),
+    { source: "job", route: "usage:approaching", shopId: shop.id, level: "warn" },
+  );
   return true;
 }
 

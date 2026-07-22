@@ -23,7 +23,15 @@ const limiters = {
   forwarding: make("forwarding", 30, "1 m"), // forwarding-verified callbacks (by IP)
   demo: make("demo", 3, "10 m"), // public landing-page real demo calls, per IP
   agentNotify: make("agentNotify", 8, "10 m"), // notify_owner SMS per shop (spam/cost guard)
-  agentTool: make("agentTool", 20, "1 m"), // check-availability / create-booking per shop
+  // check-availability / create-booking per shop. Raised from 20 because this
+  // limit is shared across a shop's SIMULTANEOUS calls, and one call makes
+  // several tool calls: five callers at once × ~4 tools each sat exactly on the
+  // old ceiling. Exceeding it is not a silent 429 — the agent speaks "One
+  // moment, please try again shortly" to a live caller, so a busy shop would
+  // have throttled itself precisely when it could least afford to. Note ingest
+  // above already allows 120/min for the same reason. Still bounded, so a
+  // runaway agent loop or a leaked token can't run up an unlimited bill.
+  agentTool: make("agentTool", 120, "1 m"),
   demoLogin: make("demoLogin", 10, "10 m"), // reviewer demo-code attempts (brute-force guard)
   mobileAuth: make("mobileAuth", 8, "10 m"), // owner-app OTP request/verify, per IP
   mobileApi: make("mobileApi", 120, "1 m"), // owner-app data calls, per device

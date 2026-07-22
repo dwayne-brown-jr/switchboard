@@ -128,6 +128,44 @@ new ApiCheck("health-error-feed", {
 });
 
 /**
+ * Voice capacity headroom.
+ *
+ * Retell caps concurrent calls at 20 on this account (burst 60, purchasable to
+ * 180). Nothing tracked it, so the first sign of hitting the ceiling would have
+ * been callers reaching nothing.
+ *
+ * Every 2 hours, not hourly, for two reasons: raising the limit is a support
+ * ticket rather than a deploy, so the alert only needs to arrive with days of
+ * room; and at 360 runs/month it keeps the project at 9,000 of 10,000 with
+ * headroom left for one more check.
+ *
+ * Asserts status is NOT "degraded" rather than IS "ok", so an unreachable
+ * Retell ("unknown") passes. That is the documented line: we alert on our own
+ * headroom, which we can fix, and not on a vendor blip, which we can't.
+ *
+ * Caveat worth remembering when reading a green result: concurrency is sampled
+ * instantaneously, so a two-hourly poll will miss short spikes. It catches
+ * sustained saturation and a silently reduced limit — not a brief burst.
+ */
+new ApiCheck("health-capacity", {
+  name: "Voice capacity — headroom against the concurrency ceiling",
+  tags: ["critical", "voice", "capacity"],
+  frequency: Frequency.EVERY_2H,
+  degradedResponseTime: DEGRADED_MS,
+  maxResponseTime: MAX_MS,
+  alertChannels,
+  request: {
+    url: `${BASE}/api/health/capacity`,
+    method: "GET",
+    followRedirects: false,
+    assertions: [
+      AssertionBuilder.statusCode().equals(200),
+      AssertionBuilder.jsonBody("$.status").notEquals("degraded"),
+    ],
+  },
+});
+
+/**
  * The landing page is the entire top of funnel: the demo call, the ROI
  * calculator and the pricing all live here. A 500 here costs signups directly.
  */

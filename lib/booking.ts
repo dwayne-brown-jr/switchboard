@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "./db";
-import { isSlotAvailable, SLOT_MINUTES, type Busy } from "./scheduling";
+import { isSlotAvailable, serviceDuration, type Busy } from "./scheduling";
 import { fuzzyMatchKey } from "./match-service";
 import type { ShopConfig } from "./schemas";
 
@@ -47,20 +47,35 @@ export async function createConfirmedBooking(args: {
   customerPhone?: string;
   callId?: string;
 }): Promise<BookingOutcome> {
-  const endUtc = new Date(args.startUtc.getTime() + SLOT_MINUTES * 60_000);
+  const { config } = args;
   // Normalize the caller's free-text service to the shop's catalog name when it
   // clearly matches one ("routine oil change for my BMW" → "Oil change"), so
   // bookings, the dashboard, and revenue estimates all speak the same names.
   // Ambiguous or novel requests keep the caller's own words.
   const rawService = args.service?.trim() || null;
-  const service = rawService ? (fuzzyMatchKey(args.config.services.map((s) => s.service), rawService) ?? rawService) : null;
+  const service = rawService ? (fuzzyMatchKey(config.services.map((s) => s.service), rawService) ?? rawService) : null;
+  // Size the appointment by the (normalized) service's duration so the whole
+  // job is reserved and validated — a 3-hr detail blocks 3 hours, not 60 min.
+  const durationMin = serviceDuration(config, service);
+  const endUtc = new Date(args.startUtc.getTime() + durationMin * 60_000);
   return prisma.$transaction(async (tx) => {
     const rows = await tx.booking.findMany({
       where: { shopId: args.shopId, status: "confirmed", endUtc: { gt: args.now } },
       select: { startUtc: true, endUtc: true },
     });
     const busy: Busy[] = rows.map((r) => ({ startUtc: r.startUtc, endUtc: r.endUtc }));
-    if (!isSlotAvailable({ hours: args.config.hours, timezone: args.timezone, busy, startUtc: args.startUtc, now: args.now })) {
+    if (
+      !isSlotAvailable({
+        hours: config.hours,
+        timezone: args.timezone,
+        busy,
+        startUtc: args.startUtc,
+        now: args.now,
+        durationMin,
+        capacity: config.capacity,
+        bufferMin: config.buffer_min,
+      })
+    ) {
       return { ok: false, reason: "unavailable" } as const;
     }
     const created = await tx.booking.create({

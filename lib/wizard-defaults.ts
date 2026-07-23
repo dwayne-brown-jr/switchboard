@@ -15,6 +15,11 @@ export function defaultWizardData(vertical: Vertical = "auto"): WizardData {
     serviceArea: "",
     services: def.services.map((s) => ({ service: s.service, priceRange: s.priceRange ?? "", bookable: s.bookable })),
     hours: structuredCloneHours(),
+    // Scheduling defaults: one job at a time, 60-min appointments, no travel
+    // buffer. The owner tunes these per business (bays/crew, job length, drive time).
+    capacity: 1,
+    defaultDurationMin: 60,
+    bufferMin: 0,
     faqs: def.faqs.map((f) => ({ ...f })),
     emergencies: { rules: [...def.hotJobRules], alertNumber: "" },
     voice: DEFAULT_VOICE,

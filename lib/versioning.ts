@@ -24,6 +24,12 @@ export function configToWizard(config: ShopConfig, shop: Shop): WizardData {
     serviceArea: config.service_area ?? "",
     services: config.services,
     hours: config.hours,
+    // Carry scheduling settings back so a settings edit doesn't reset them to
+    // defaults (per-service durations ride along on `services`). `?? undefined`
+    // lets zod apply the default for configs saved before these fields existed.
+    capacity: config.capacity ?? undefined,
+    defaultDurationMin: config.default_duration_min ?? undefined,
+    bufferMin: config.buffer_min ?? undefined,
     faqs: config.faqs,
     emergencies: { rules: config.hot_job_rules, alertNumber: config.escalation.alert_number ?? "" },
     voice: config.voice,

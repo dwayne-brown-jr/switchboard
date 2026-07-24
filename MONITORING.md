@@ -105,6 +105,21 @@ outage passes. That is the whole distinction in one assertion.
 two-hourly poll misses short spikes. It catches sustained saturation and a
 silently reduced limit, not a brief burst.
 
+### The availability SLO
+
+One check states a numeric objective rather than a yes/no: the availability
+lookup — "what times are open?", which runs while a caller waits — completes in
+**≤ 1500 ms**. Set from the staging stress test (p95 1100 ms warm).
+
+`/api/health/availability` runs the real path against the public demo shop and
+reports the **warm computation time, not the HTTP round trip**. During a live
+call the endpoint is warm, so warm time is what a caller feels; timing the round
+trip on an hourly probe would measure Vercel cold-start noise instead. The check
+asserts on `$.status`, so a cold start can't book a false breach.
+
+If p95 drifts toward 1500 ms under real load, the fix is to cache the shop's
+live config instead of re-reading it on every tool call.
+
 ### What is deliberately NOT monitored
 - **Vendor APIs** (Retell, Twilio, Stripe, Anthropic). A third-party blip would
   page us for something we can't fix, and polling paid APIs every few minutes
@@ -113,6 +128,63 @@ silently reduced limit, not a brief burst.
 - **Most individual routes.** The app is one Vercel deployment — routes ship
   atomically. If `/` and `/api/health` are up, the other routes exist. Per-route
   checks would burn the run budget to tell us what we already know.
+
+---
+
+## Phone-waking alerts (the two that mean customers can't be served)
+
+Email doesn't wake anyone at 3am. Two checks — **DB unreachable** (`health-db`)
+and **voice path misconfigured** (`health-call-path`) — escalate to an operator
+SMS on top of email. Everything else stays email-only.
+
+**Path:** Checkly webhook → `POST /api/alerts/critical` → Twilio SMS. A webhook,
+not Checkly's native SMS, because SMS is a paid Checkly feature that lapses when
+the trial ends; webhooks are free forever.
+
+**Why it survives a DB outage** — the case it most needs to. A dead database
+does not take Vercel down, so the app still serves requests. `/api/alerts/critical`
+imports nothing that touches the database, so it can still send the text that
+says the database is down. Its only dependency is Twilio.
+
+**The one gap, stated plainly:** if Vercel *itself* is down, this endpoint is
+down too and no SMS goes out. Checkly still emails. Total-Vercel-down is rarer
+than a DB hiccup; closing it means a second host, out of scope for now.
+
+**To finish wiring it — two env vars in Vercel (production):**
+
+| Var | Value |
+|---|---|
+| `OPERATOR_ALERT_PHONE` | your mobile, E.164 (e.g. `+1760…`) |
+| `TWILIO_ALERT_FROM` | one of the account's Twilio numbers to send from |
+
+Until both are set the endpoint returns `{ok:false, reason:"…not set"}` and no
+SMS is sent — the webhook fires harmlessly. `CRITICAL_ALERT_SECRET` (the shared
+secret in the webhook URL) is already set; the Checkly channel already carries
+the full URL. Nothing else to configure.
+
+---
+
+## Backups & restore (Turso)
+
+- **Delete protection is ON** for the production database — it cannot be dropped
+  by an errant `turso db destroy`.
+- **Point-in-time restore is available and rehearsed.** Turso keeps a rolling
+  restore window; recovery is a clone from a timestamp, not a downtime.
+
+  Rehearsed 2026-07-24: cloned production as of 10 minutes prior into a
+  throwaway, confirmed it carried real data (3 shops, 97 call records), then
+  destroyed the clone. The drill is:
+
+  ```bash
+  # restore to a new database as of a point in time (RFC3339)
+  turso db create switchboard-restore --from-db switchboard \
+    --timestamp 2026-07-24T20:26:13Z
+  # verify, then either promote it (repoint DATABASE_URL) or destroy it
+  turso db shell switchboard-restore "SELECT COUNT(*) FROM CallRecord;"
+  ```
+
+  To actually recover, point `DATABASE_URL` / `TURSO_AUTH_TOKEN` in Vercel at the
+  restored database and redeploy. Re-run the drill after any schema change.
 
 ---
 
@@ -144,11 +216,11 @@ upgrading to Starter ($24/mo, 25k API runs), then update `checkly.config.ts`.
 ## Current status (deployed)
 
 Live in Checkly under **Switchboard Production Monitoring**. Alerts go to
-`dwaynebrown2012@gmail.com`; all 14 checks are subscribed.
+`dwaynebrown2012@gmail.com`; all 15 checks are subscribed.
 
 | | State |
 |---|---|
-| 7 API checks | ✅ passing |
+| 8 API checks | ✅ passing |
 | 6 cron heartbeats | ✅ created, ping URLs wired into Vercel |
 | `cron-onboarding-sweep` | ✅ **verified end-to-end** — triggered via QStash, job ran, ping received |
 | Browser check | ✅ **active** — signs in at `/demo` and asserts the dashboard renders |

@@ -31,6 +31,13 @@ export function classifyCallPath(
   live: LiveShop[],
   lastCallByShop: Map<string, Date>,
   now: number,
+  /** The public demo shop, exempt from SILENCE but not from misconfiguration.
+   *  Its line only rings when someone tries the landing-page demo, so "no calls
+   *  in 4 days" means "nobody demoed this week", not "the phone is broken" — the
+   *  same ambiguity that makes a brand-new shop unmeasurable. But if it loses
+   *  its number or agent version the demo itself is down, and that IS worth
+   *  knowing immediately, so misconfiguration still counts. */
+  silenceExemptShopId?: string | null,
 ): CallPathStatus {
   const cutoff = now - SILENT_DAYS * 86_400_000;
 
@@ -42,6 +49,7 @@ export function classifyCallPath(
       misconfigured++;
       continue; // can't answer at all — silence is a given, not a second finding
     }
+    if (shop.id === silenceExemptShopId) continue; // demo line — silence is expected
     const last = lastCallByShop.get(shop.id);
     if (last && last.getTime() < cutoff) silent++;
   }

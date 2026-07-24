@@ -1,4 +1,4 @@
-import { EmailAlertChannel } from "checkly/constructs";
+import { EmailAlertChannel, WebhookAlertChannel } from "checkly/constructs";
 
 // Alert routing for every check.
 //
@@ -25,3 +25,33 @@ export const emailChannel = new EmailAlertChannel("switchboard-email-alerts", {
 });
 
 export const alertChannels = [emailChannel];
+
+// Phone-waking escalation for the two checks that mean customers can't be
+// served (DB down, voice path misconfigured). A webhook — not Checkly's SMS —
+// because SMS is a paid feature that lapses when this trial ends, whereas
+// webhooks work on the free plan forever. It POSTs to /api/alerts/critical,
+// which texts the operator via the app's own Twilio (see that route for why
+// that still works when the database is down).
+//
+// The full URL — including its ?secret — is read at deploy time from
+// CRITICAL_ALERT_WEBHOOK_URL so the secret never enters the repo. When it's
+// unset the channel isn't created and the critical checks simply fall back to
+// email, so this is safe to ship before the secret is wired.
+//
+// sendRecovery too: a 3am "it's back" text is worth as much as the alarm.
+const criticalWebhookUrl = process.env.CRITICAL_ALERT_WEBHOOK_URL;
+
+export const criticalChannels = criticalWebhookUrl
+  ? [
+      ...alertChannels,
+      new WebhookAlertChannel("switchboard-critical-webhook", {
+        name: "Critical → operator SMS",
+        method: "POST",
+        url: criticalWebhookUrl,
+        template: JSON.stringify({ check_name: "{{CHECK_NAME}}", alert_type: "{{ALERT_TYPE}}" }),
+        sendFailure: true,
+        sendRecovery: true,
+        sendDegraded: false,
+      }),
+    ]
+  : alertChannels;

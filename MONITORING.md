@@ -132,7 +132,7 @@ every 30m = 1,440
 every 60m =   720
 ```
 
-**Current spend: 9,000 / 10,000 API runs · 720 / 1,000 browser runs.**
+**Current spend: 9,360 / 10,000 API runs · 720 / 1,000 browser runs.**
 
 **One location (`us-west-1`) on purpose.** Locations multiply run count.
 us-west-1 is closest to our California customers and to the Vercel region.

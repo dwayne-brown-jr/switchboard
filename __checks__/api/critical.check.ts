@@ -1,5 +1,5 @@
 import { ApiCheck, AssertionBuilder, Frequency } from "checkly/constructs";
-import { alertChannels } from "../alert-channels";
+import { alertChannels, criticalChannels } from "../alert-channels";
 
 // Critical path: if either of these is red, the product is down for everyone.
 // Budget: 4,320 + 1,440 = 5,760 runs/month (see checkly.config.ts).
@@ -34,7 +34,8 @@ new ApiCheck("health-db", {
   frequency: Frequency.EVERY_10M,
   degradedResponseTime: DEGRADED_MS,
   maxResponseTime: MAX_MS,
-  alertChannels,
+  // Phone-waking: a dead database means every shop is down.
+  alertChannels: criticalChannels,
   request: {
     url: `${BASE}/api/health`,
     method: "GET",
@@ -75,7 +76,8 @@ new ApiCheck("health-call-path", {
   frequency: Frequency.EVERY_1H,
   degradedResponseTime: DEGRADED_MS,
   maxResponseTime: MAX_MS,
-  alertChannels,
+  // Phone-waking: a live shop that can't answer is a customer outage.
+  alertChannels: criticalChannels,
   request: {
     url: `${BASE}/api/health/calls`,
     method: "GET",
@@ -161,6 +163,38 @@ new ApiCheck("health-capacity", {
     assertions: [
       AssertionBuilder.statusCode().equals(200),
       AssertionBuilder.jsonBody("$.status").notEquals("degraded"),
+    ],
+  },
+});
+
+/**
+ * SLO: the availability lookup answers within budget while a caller waits.
+ *
+ * This is the one latency objective that maps to a caller's real experience —
+ * "what times are open?" runs mid-call, and a slow answer is dead air. The
+ * endpoint reports the warm COMPUTATION time (see it for why not the round
+ * trip), and this asserts it against the 1500ms objective in lib/slo.ts.
+ *
+ * Every 2 hours = 360 runs/month, taking the project to 9,360 of 10,000. That's
+ * ~360 samples/month for a p95 trend on the Checkly dashboard — enough to see
+ * drift, sparse enough to stay under the free-tier cap.
+ */
+new ApiCheck("slo-availability", {
+  name: "SLO — availability lookup answers in time",
+  tags: ["slo", "voice"],
+  frequency: Frequency.EVERY_2H,
+  degradedResponseTime: DEGRADED_MS,
+  maxResponseTime: MAX_MS,
+  alertChannels,
+  request: {
+    url: `${BASE}/api/health/availability`,
+    method: "GET",
+    followRedirects: false,
+    assertions: [
+      AssertionBuilder.statusCode().equals(200),
+      // The SLO lives in the body (warm computation ms), not in responseTime,
+      // so an hourly cold start can't book a false breach.
+      AssertionBuilder.jsonBody("$.status").equals("ok"),
     ],
   },
 });

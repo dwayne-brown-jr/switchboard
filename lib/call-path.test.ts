@@ -62,4 +62,32 @@ describe("classifyCallPath", () => {
     const res = classifyCallPath([ready("a")], new Map([["a", daysAgo(3.9)]]), NOW);
     expect(res.status).toBe("ok");
   });
+
+  it("does not count the public demo shop as silent — its line rings only on demos", () => {
+    const res = classifyCallPath([ready("demo")], new Map([["demo", daysAgo(9)]]), NOW, "demo");
+    expect(res).toEqual({ status: "ok", silent: 0, misconfigured: 0 });
+  });
+
+  it("still flags the public demo shop when it is misconfigured — the demo itself is down", () => {
+    const res = classifyCallPath(
+      [{ id: "demo", agentNumber: null, liveVersionId: "v1" }],
+      new Map(),
+      NOW,
+      "demo",
+    );
+    expect(res).toEqual({ status: "degraded", silent: 0, misconfigured: 1 });
+  });
+
+  it("exempts only the named shop, not others that went silent", () => {
+    const res = classifyCallPath(
+      [ready("demo"), ready("real")],
+      new Map([
+        ["demo", daysAgo(9)],
+        ["real", daysAgo(9)],
+      ]),
+      NOW,
+      "demo",
+    );
+    expect(res).toEqual({ status: "degraded", silent: 1, misconfigured: 0 });
+  });
 });

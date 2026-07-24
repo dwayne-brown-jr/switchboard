@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { reportError } from "./observability";
 import { notifyAdmins } from "./notify";
 import { DEMO_SHOP_ID } from "./demo-login";
+import { publicDemoShopId } from "./public-demo";
 import { SILENT_DAYS, classifyCallPath, type CallPathStatus } from "./call-path";
 import {
   ERROR_WINDOW_MINUTES,
@@ -53,7 +54,7 @@ export async function callPathStatus(): Promise<CallPathStatus> {
     if (row._max.timestamp) lastCallByShop.set(row.shopId, row._max.timestamp);
   }
 
-  return classifyCallPath(live, lastCallByShop, Date.now());
+  return classifyCallPath(live, lastCallByShop, Date.now(), publicDemoShopId());
 }
 
 /** Read-only view of the failure feed for external monitoring
@@ -107,11 +108,15 @@ export async function capacityStatus(): Promise<CapacityStatus> {
  *  failure feed so a persistently-silent shop pages at most once a day. */
 export async function detectSilentShops(): Promise<{ scanned: number; silent: number }> {
   const cutoff = Date.now() - SILENT_DAYS * 86_400_000;
+  // Excluded from silence detection:
+  //  - the reviewer demo shop (DEMO_SHOP_ID): "live" with mock calls frozen at
+  //    seed time, so it reads as silent a few days after every seed.
+  //  - the public demo shop (PUBLIC_DEMO_SHOP_ID): its line only rings when
+  //    someone tries the landing-page demo, so a quiet week is expected, not a
+  //    broken voice path.
+  const exempt = [DEMO_SHOP_ID, publicDemoShopId()].filter((id): id is string => !!id);
   const shops = await prisma.shop.findMany({
-    // The reviewer demo shop is "live" with mock calls frozen at seed time, so it
-    // reads as a silent shop a few days after every seed. Excluded everywhere we
-    // reason about real call volume.
-    where: { status: "live", liveVersionId: { not: null }, id: { not: DEMO_SHOP_ID } },
+    where: { status: "live", liveVersionId: { not: null }, id: { notIn: exempt } },
     select: { id: true, businessName: true },
   });
 

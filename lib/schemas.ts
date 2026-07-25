@@ -9,6 +9,9 @@ export const serviceSchema = z.object({
   service: z.string(),
   priceRange: z.string().optional().default(""),
   bookable: z.boolean().default(true),
+  // How long this service takes, in minutes. Optional — falls back to the shop's
+  // default_duration_min when unset (a full detail = 180, a quick wash = 45).
+  durationMin: z.number().int().positive().optional(),
 });
 
 export const faqSchema = z.object({
@@ -43,6 +46,12 @@ export const wizardSchema = z.object({
   serviceArea: z.string().default(""),
   services: z.array(serviceSchema).default([]),
   hours: hoursSchema,
+  // Scheduling capacity: how many appointments can run at once (1 mobile washer
+  // vs 3 auto-shop bays), the default job length, and a gap/travel buffer around
+  // each job. Defaults reproduce the original one-at-a-time / 60-min behavior.
+  capacity: z.number().int().min(1).default(1),
+  defaultDurationMin: z.number().int().positive().default(60),
+  bufferMin: z.number().int().min(0).default(0),
   faqs: z.array(faqSchema).default([]),
   emergencies: z
     .object({
@@ -71,6 +80,11 @@ export const configSchema = z.object({
   service_area: z.string().nullable(),
   hours: hoursSchema,
   services: z.array(serviceSchema),
+  // Scheduling model (see wizardSchema). Optional in config for backward-compat
+  // with versions stored before this field existed; callers default them.
+  capacity: z.number().int().min(1).default(1),
+  default_duration_min: z.number().int().positive().default(60),
+  buffer_min: z.number().int().min(0).default(0),
   price_ranges: z.record(z.string(), z.string()),
   booking_fields: z.array(z.string()),
   faqs: z.array(faqSchema),

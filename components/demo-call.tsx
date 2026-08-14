@@ -6,6 +6,15 @@ import { DEMO_TYPES, demoType, resolveVars, type DemoTypeId, type Line } from "@
 
 type Phase = "idle" | "connecting" | "live" | "error";
 
+// Inline Lucide-style mic, matching the hand-rolled icon set in app/page.tsx —
+// the project ships no icon library, so icons stay inline and dependency-free.
+const micIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3" />
+  </svg>
+);
+
 /** `compact` renders the demo as a single stacked column with the personalize
  *  fields tucked behind a disclosure — so the real, working demo can sit in the
  *  hero next to the headline instead of a decorative fake below the fold. */
@@ -144,7 +153,7 @@ export function DemoCall({ realCallEnabled, compact = false }: { realCallEnabled
               type="button"
               onClick={() => selectType(t.id)}
               className={`rounded-xl border p-3 text-left text-sm transition ${
-                type === t.id ? "border-brand-500 bg-brand-50 ring-2 ring-brand-200" : "border-slate-200 hover:border-slate-300"
+                type === t.id ? "border-accent-500 bg-accent-50 ring-2 ring-accent-200" : "border-slate-200 hover:border-slate-300"
               }`}
             >
               <span className="font-semibold text-slate-900">{t.label}</span>
@@ -178,8 +187,8 @@ export function DemoCall({ realCallEnabled, compact = false }: { realCallEnabled
                 <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> End call
               </button>
             ) : (
-              <button type="button" onClick={startCall} disabled={phase === "connecting"} className="btn-primary px-5 py-3 text-base">
-                🎙️ {phase === "connecting" ? "Connecting…" : "Start the demo call"}
+              <button type="button" onClick={startCall} disabled={phase === "connecting"} className="btn-accent px-5 py-3 text-base">
+                {micIcon} {phase === "connecting" ? "Connecting…" : "Start the demo call"}
               </button>
             )}
           </div>

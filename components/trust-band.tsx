@@ -65,8 +65,8 @@ export function TrustBand() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Built locally</p>
             <p className="mt-2 font-display text-2xl font-extrabold tracking-tight text-slate-900">Vista, CA</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Built and supported by one person here in North County — not an overseas call center. If something&apos;s
-              wrong, you talk to whoever built it.
+              Built and supported by Dwayne — a lead service advisor with 8 years on the service drive, based here in
+              North County. If something&apos;s wrong, you talk to the person who built it.
             </p>
           </div>
 
@@ -82,7 +82,7 @@ export function TrustBand() {
 
         <p className="mt-6 text-center text-sm text-slate-500">
           Rather see the price math first?{" "}
-          <Link href="#pricing" className="font-medium text-brand-600 underline underline-offset-2">
+          <Link href="#pricing" className="font-medium text-accent-600 underline underline-offset-2">
             Run your own numbers
           </Link>
           .

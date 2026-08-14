@@ -54,6 +54,13 @@ export async function startCheckout(planId: string) {
     subscription_data: { metadata: { shopId: shop.id, plan: planId } },
     metadata: { shopId: shop.id, plan: planId },
     allow_promotion_codes: true,
+    // Pilot shops redeem a 100%-off-first-month promotion code, and a free
+    // pilot should mean no card: skip payment collection when the first
+    // invoice is $0. Full-price signups still enter a card as before. When a
+    // pilot's month 2 invoices with no payment method, the sub goes past_due
+    // instead of silently billing — converting is the "we talk after"
+    // conversation the pilot promises, done from the billing portal.
+    payment_method_collection: "if_required",
   });
 
   if (!session.url) throw new Error("Could not start checkout.");

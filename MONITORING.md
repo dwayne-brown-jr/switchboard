@@ -348,11 +348,24 @@ Heartbeats only work once each job knows its ping URL. After `deploy`:
 | `HEARTBEAT_URL_RECLAIM_NUMBERS` | `/api/jobs/reclaim-numbers` |
 | `HEARTBEAT_URL_HEALTH_CHECK` | `/api/jobs/health-check` |
 | `HEARTBEAT_URL_WEEKLY_DIGEST` | `/api/jobs/weekly-digest` |
+| `HEARTBEAT_URL_CUSTOMER_ROLLUPS` | `/api/jobs/customer-rollups` |
 
 3. Redeploy so the vars take effect.
 
 Until a URL is set the job just doesn't ping — and the monitor **will alert**.
 Set them promptly, or leave those monitors deactivated in the meantime.
+
+**`cron-customer-rollups` ships deactivated** for exactly that reason — it was
+added after the other six, so its Vercel var doesn't exist yet and it would page
+on its first missed window no matter how healthy the job is. To turn it on:
+
+1. `npx checkly deploy` (creates the monitor, still deactivated).
+2. Copy its ping URL → `HEARTBEAT_URL_CUSTOMER_ROLLUPS` in Vercel (production).
+3. Redeploy the app so the var is readable.
+4. Set `activated: true` in `__checks__/heartbeat/crons.check.ts`, `npx checkly deploy` again.
+
+The QStash schedule itself is already live (`30 8 * * *`), so the job runs and
+reconciles regardless — this only governs whether a *failure* pages you.
 
 ### 4. Activate the browser check
 It ships **deactivated** because it depends on the demo login existing. To turn on:

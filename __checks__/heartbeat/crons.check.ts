@@ -79,3 +79,23 @@ new HeartbeatMonitor("cron-weekly-digest", {
   graceUnit: "days",
   alertChannels,
 });
+
+new HeartbeatMonitor("cron-customer-rollups", {
+  name: "Cron — customer rollup reconciliation (daily 08:30 UTC)",
+  tags: ["cron", "crm"],
+  period: 1,
+  periodUnit: "days",
+  grace: 4,
+  graceUnit: "hours",
+  // Ships DEACTIVATED, unlike its five daily siblings. Every other monitor here
+  // was added alongside an already-populated HEARTBEAT_URL_* var; this one is
+  // new, so `HEARTBEAT_URL_CUSTOMER_ROLLUPS` doesn't exist in Vercel yet. A
+  // heartbeat monitor with no matching ping URL cannot ever be pinged, so
+  // deploying it active would page on its first missed window — guaranteed, and
+  // for a reason that has nothing to do with the job.
+  //
+  // Flip to true AFTER the URL is copied into Vercel and the app is redeployed.
+  // See MONITORING.md.
+  activated: false,
+  alertChannels,
+});

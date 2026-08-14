@@ -34,6 +34,35 @@ Tracked so nothing gets lost. Ordered roughly by when it must be addressed.
 - [ ] **Shared SIP trunk is a single point of failure** for all shops' inbound voice —
       add a health check + alert + documented recovery.
 
+## Customer layer (CRM) — see docs/CRM-PLAN.md
+- [x] **Phase A: customer spine — DONE (2026-08-10).** `Customer` + `CustomerPhone`
+      (+ assets/tags/events, and the Phase-D follow-up tables) now exist, and every
+      inbound call and agent booking resolves the caller to one. Identity is an
+      upsert on `@@unique([shopId, phoneE164])`, which is what makes the mid-call
+      `create_booking` path and the post-call `call-events` webhook converge on the
+      same customer regardless of which lands first — verified by mutation test.
+      Numbers that can't be normalized (blocked caller ID) stay deliberately
+      unlinked rather than collapsing into one fictional customer.
+      **Deploy step:** apply `prisma/prod-migrations/2026-08-10-customer-layer.sql`
+      to prod Turso, then run `node scripts/backfill-customers.mjs --dry` and read
+      the normalization report BEFORE running it for real.
+      *Note: the prod migration deliberately adds `CallRecord.customerId` /
+      `Booking.customerId` WITHOUT FK constraints — SQLite can't add a FK in place
+      and Prisma's own diff would DROP and recreate the live CallRecord table. See
+      the migration header.*
+- [ ] **Phase B: web CRM UI** — `/app/customers` list + detail with unified timeline.
+      Must resolve the shop through the same helper as the other owner pages so it
+      inherits the multi-shop fix below rather than duplicating the `findFirst` bug.
+- [ ] **Phase C: agent returning-caller recognition** — a `lookup_customer` agent
+      tool so the AI opens with "Hi Dwayne, is this about the Silverado again?".
+      Needs a hard timeout + silent degradation: a cold open is fine, dead air isn't.
+- [ ] **Phase D: pipeline + follow-up engine** — schema is in place and
+      `FollowUpRule.enabled` defaults to false. **Blocked on A2P:** texting a shop's
+      *customers* is a different campaign use-case from texting the *owner*, on a
+      carrier clock. Email first. See docs/CRM-PLAN.md §5.
+- [ ] **Phase E: analytics + mobile** — repeat rate, LTV, unbooked-call recovery
+      funnel; caller-name enrichment on push notifications.
+
 ## Product depth
 - [ ] **Warm transfer + hold/fallback.** Handoff is currently a *cold* transfer; warm
       (agent briefs the owner, falls back to a message on no-answer) is nicer — Retell's

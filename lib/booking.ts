@@ -54,7 +54,20 @@ export async function createConfirmedBooking(args: {
   // Ambiguous or novel requests keep the caller's own words.
   const rawService = args.service?.trim() || null;
   const service = rawService ? (fuzzyMatchKey(args.config.services.map((s) => s.service), rawService) ?? rawService) : null;
-  return prisma.$transaction(async (tx) => {
+
+  // Customer layer. This runs MID-call, before the call-events webhook has
+  // fired — so this is often the first thing to see the caller's number, and
+  // the booking carries a name the webhook never gets. Resolved outside the
+  // transaction so the slot-contention transaction stays as short as possible;
+  // it's an upsert on a unique index, so racing it with the webhook path is
+  // safe and both converge on the same customer.
+  const { resolveCustomerSafe, refreshRollupsSafe } = await import("./customer");
+  const customer = await resolveCustomerSafe(args.shopId, args.customerPhone, {
+    name: args.customerName,
+    at: args.now,
+  });
+
+  const outcome = await prisma.$transaction(async (tx) => {
     const rows = await tx.booking.findMany({
       where: { shopId: args.shopId, status: "confirmed", endUtc: { gt: args.now } },
       select: { startUtc: true, endUtc: true },
@@ -71,6 +84,7 @@ export async function createConfirmedBooking(args: {
         service,
         customerName: args.customerName?.trim() || null,
         customerPhone: args.customerPhone?.trim() || null,
+        customerId: customer?.id ?? null,
         callId: args.callId || null,
         source: "agent",
         status: "confirmed",
@@ -79,4 +93,9 @@ export async function createConfirmedBooking(args: {
     });
     return { ok: true, booking: { id: created.id, startUtc: created.startUtc.toISOString(), service: created.service } } as const;
   });
+
+  // Only touch rollups when a booking actually landed — an unavailable slot
+  // isn't contact worth recording against the customer.
+  if (outcome.ok) await refreshRollupsSafe(customer?.id);
+  return outcome;
 }

@@ -159,8 +159,21 @@ than a DB hiccup; closing it means a second host, out of scope for now.
 
 Until both are set the endpoint returns `{ok:false, reason:"…not set"}` and no
 SMS is sent — the webhook fires harmlessly. `CRITICAL_ALERT_SECRET` (the shared
-secret in the webhook URL) is already set; the Checkly channel already carries
-the full URL. Nothing else to configure.
+secret in the webhook URL) is already set, and the Checkly channel carries the
+full URL.
+
+> **⚠️ Deploying Checkly can DELETE this channel.** `checkly deploy` is
+> declarative — it removes anything the parsed project doesn't declare. The
+> channel is built at deploy time from env vars, so a deploy run from a shell
+> that lacks them drops it from the project and Checkly deletes it, silently
+> downgrading the two customers-can't-be-served checks from a phone-waking SMS
+> to email. This actually happened in a `--preview` on 2026-08-14 and was caught
+> before it ran.
+>
+> `__checks__/alert-channels.ts` now composes the URL from `APP_URL` +
+> `CRITICAL_ALERT_SECRET`, so **`vercel env pull` before deploying is enough**.
+> Regardless: always run `npx checkly deploy --preview` first and read the plan.
+> If it says `Delete: AlertChannel`, stop — your environment is incomplete.
 
 ---
 
@@ -355,17 +368,8 @@ Heartbeats only work once each job knows its ping URL. After `deploy`:
 Until a URL is set the job just doesn't ping — and the monitor **will alert**.
 Set them promptly, or leave those monitors deactivated in the meantime.
 
-**`cron-customer-rollups` ships deactivated** for exactly that reason — it was
-added after the other six, so its Vercel var doesn't exist yet and it would page
-on its first missed window no matter how healthy the job is. To turn it on:
-
-1. `npx checkly deploy` (creates the monitor, still deactivated).
-2. Copy its ping URL → `HEARTBEAT_URL_CUSTOMER_ROLLUPS` in Vercel (production).
-3. Redeploy the app so the var is readable.
-4. Set `activated: true` in `__checks__/heartbeat/crons.check.ts`, `npx checkly deploy` again.
-
-The QStash schedule itself is already live (`30 8 * * *`), so the job runs and
-reconciles regardless — this only governs whether a *failure* pages you.
+`cron-customer-rollups` was added last (2026-08-14) and is now fully wired:
+monitor deployed, `HEARTBEAT_URL_CUSTOMER_ROLLUPS` set in Vercel, `activated: true`.
 
 ### 4. Activate the browser check
 It ships **deactivated** because it depends on the demo login existing. To turn on:

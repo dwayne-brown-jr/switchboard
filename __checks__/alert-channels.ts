@@ -33,13 +33,34 @@ export const alertChannels = [emailChannel];
 // which texts the operator via the app's own Twilio (see that route for why
 // that still works when the database is down).
 //
-// The full URL — including its ?secret — is read at deploy time from
-// CRITICAL_ALERT_WEBHOOK_URL so the secret never enters the repo. When it's
-// unset the channel isn't created and the critical checks simply fall back to
-// email, so this is safe to ship before the secret is wired.
+// The full URL — including its ?secret — is read at deploy time so the secret
+// never enters the repo.
+//
+// ⚠️ WHY THERE IS A FALLBACK, AND WHY IT MATTERS
+//
+// `checkly deploy` is DECLARATIVE: it deletes anything in the account that the
+// parsed project doesn't declare. This channel used to come only from an
+// explicit CRITICAL_ALERT_WEBHOOK_URL, set ad-hoc in one shell and persisted
+// nowhere. That is safe exactly once. Every LATER deploy from a shell without
+// that var silently dropped the channel from the project, so Checkly deleted
+// it — quietly downgrading the two checks that mean customers can't be served
+// (DB down, voice path misconfigured) from a phone-waking SMS to an email
+// nobody reads at 3am. Caught by `--preview` showing `Delete:` on 2026-08-14.
+//
+// So: fall back to composing the URL from APP_URL + CRITICAL_ALERT_SECRET, both
+// of which live in Vercel. `vercel env pull` before deploying is now enough to
+// preserve the channel, and no one has to remember a variable that appears in
+// no .env file.
+//
+// Still run `npx checkly deploy --preview` first and read the plan. If it says
+// `Delete: AlertChannel`, STOP — the environment is incomplete, not the intent.
 //
 // sendRecovery too: a 3am "it's back" text is worth as much as the alarm.
-const criticalWebhookUrl = process.env.CRITICAL_ALERT_WEBHOOK_URL;
+const criticalWebhookUrl =
+  process.env.CRITICAL_ALERT_WEBHOOK_URL ??
+  (process.env.APP_URL && process.env.CRITICAL_ALERT_SECRET
+    ? `${process.env.APP_URL}/api/alerts/critical?secret=${process.env.CRITICAL_ALERT_SECRET}`
+    : undefined);
 
 export const criticalChannels = criticalWebhookUrl
   ? [

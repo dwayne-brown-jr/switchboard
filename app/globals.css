@@ -76,21 +76,13 @@ body {
   letter-spacing: -0.025em;
 }
 
-/* Warm→cool gradient text for headline highlights. */
-.text-gradient {
-  background: linear-gradient(100deg, #ea580c 0%, #f97316 40%, #3563eb 110%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 /* Gradient glow + ring on hover.
  *
  * Two effects: a crisp gradient ring on the card's edge (::before, masked) and
  * a soft coloured halo outside it (box-shadow — see the note on why it is not a
  * pseudo-element).
  *
- * Colours are the site's existing warm→cool signature (.text-gradient, .mesh),
+ * Colours are the site's existing warm→cool signature (.mesh),
  * with a light blue in the middle so the sweep reads as multi-colour rather
  * than a two-tone fade.
  *

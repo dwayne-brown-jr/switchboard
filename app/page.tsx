@@ -11,6 +11,10 @@ import { ScrollLink } from "@/components/scroll-link";
 import { DEMO_TYPES, demoAgentEnvKey } from "@/lib/demo";
 import { Logo } from "@/components/logo";
 
+// Parent umbrella brand. Empty until the Handoff domain is bought; the footer
+// credit renders as plain text until then and becomes a link automatically.
+const HANDOFF_URL = "";
+
 // --- tiny inline icon set (Lucide-style, currentColor stroke) ---------------
 const svg = (children: ReactNode) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -40,6 +44,45 @@ const icons: Record<string, ReactNode> = {
     </>,
   ),
   chat: svg(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />),
+};
+
+// Trade icons for the "Who it's for" grid — same hand-rolled Lucide style as
+// the set above (the project ships no icon library on purpose).
+const tradeIcons: Record<Vertical, ReactNode> = {
+  auto: svg(
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />,
+  ),
+  auto_appearance: svg(
+    <path d="M12 3l1.9 5.7a2 2 0 0 0 1.4 1.4L21 12l-5.7 1.9a2 2 0 0 0-1.4 1.4L12 21l-1.9-5.7a2 2 0 0 0-1.4-1.4L3 12l5.7-1.9a2 2 0 0 0 1.4-1.4L12 3z" />,
+  ),
+  hvac: svg(
+    <>
+      <path d="M2 12h20M12 2v20" />
+      <path d="m20 16-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4" />
+    </>,
+  ),
+  home_services: svg(
+    <>
+      <path d="m3 11 9-8 9 8" />
+      <path d="M5 11v9h14v-9" />
+      <path d="M9 20v-6h6v6" />
+    </>,
+  ),
+  cleaning: svg(
+    <>
+      <path d="M3 3h.01M7 5h.01M11 7h.01M3 7h.01M7 9h.01M3 11h.01" />
+      <rect width="4" height="4" x="15" y="5" />
+      <path d="m19 9 2 2v10c0 .6-.4 1-1 1h-6c-.6 0-1-.4-1-1V11l2-2" />
+      <path d="m13 14 8-2M13 19l8-2" />
+    </>,
+  ),
+  other: svg(
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22v-4h6v4" />
+      <path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M16 10h.01M8 10h.01M12 14h.01M16 14h.01M8 14h.01" />
+    </>,
+  ),
 };
 
 const steps = [
@@ -111,11 +154,11 @@ export default function Home() {
               </div>
               <h1 className="rise mt-5 max-w-2xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl" style={{ animationDelay: "80ms" }}>
                 An answering service takes a message.{" "}
-                <span className="text-gradient">Switchboard books the job.</span>
+                <span className="text-accent-600">Switchboard books the job.</span>
               </h1>
               <p className="rise mt-6 max-w-xl text-lg leading-8 text-slate-600" style={{ animationDelay: "160ms" }}>
                 A friendly AI receptionist answers every call 24/7, books straight onto your calendar, and texts you the
-                urgent ones. Talk to it yourself right now — no sign-up, no phone needed.
+                urgent ones. Try it right now — no sign-up.
               </p>
               <div className="rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "240ms" }}>
                 <Link href="/login" className="btn-accent px-5 py-3 text-base">Set up my receptionist</Link>
@@ -152,6 +195,23 @@ export default function Home() {
         {/* Proof band — sits where a logo wall goes once there are customers */}
         <TrustBand />
 
+        {/* North County pilot — deliberately quieter than the main sections.
+            Free 30-day pilot for local shops; remove once the slots fill. */}
+        <section className="border-b border-slate-200 bg-slate-50/60">
+          <div className="mx-auto max-w-3xl px-6 py-10 text-center">
+            <Reveal>
+              <h2 className="font-display text-lg font-bold text-slate-900">Local to North County San Diego?</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                I&apos;m taking a small number of shops for a free 30-day pilot — you get a month of answered phones and
+                real numbers, I get feedback. If it books you jobs, we talk after. If not, you&apos;ve lost nothing.
+              </p>
+              <a href="mailto:support@getswitchboardhq.com?subject=North%20County%20pilot" className="btn-secondary mt-4">
+                Ask about a pilot
+              </a>
+            </Reveal>
+          </div>
+        </section>
+
         {/* How it works */}
         <section id="how-it-works" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-20">
@@ -162,9 +222,9 @@ export default function Home() {
             </Reveal>
             <ol className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {steps.map((s, i) => (
-                <Reveal as="li" key={s.n} delay={i * 90} className="glow-ring group relative rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1">
+                <Reveal as="li" key={s.n} delay={i * 90} className="glow-ring group relative rounded-2xl border border-slate-200 bg-white p-5 transition duration-300 hover:-translate-y-1">
                   <span className="font-display text-3xl font-extrabold text-slate-200 transition group-hover:text-accent-400">{s.n}</span>
-                  <h3 className="mt-3 text-base font-semibold text-slate-900">{s.title}</h3>
+                  <h3 className="mt-2 text-base font-semibold text-slate-900">{s.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{s.body}</p>
                 </Reveal>
               ))}
@@ -181,11 +241,11 @@ export default function Home() {
             </Reveal>
             <div className="mt-10 grid gap-5 sm:grid-cols-3">
               {features.map((f, i) => (
-                <Reveal key={f.title} delay={i * 90} className="glow-ring group rounded-2xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100 transition group-hover:bg-accent-50 group-hover:text-accent-600 group-hover:ring-accent-100">
+                <Reveal key={f.title} delay={i * 90} className="glow-ring group rounded-2xl border border-slate-200 bg-white p-5 transition duration-300 hover:-translate-y-1">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent-50 text-accent-600 ring-1 ring-accent-100">
                     {icons[f.icon]}
                   </span>
-                  <h3 className="mt-4 text-base font-semibold text-slate-900">{f.title}</h3>
+                  <h3 className="mt-3 text-base font-semibold text-slate-900">{f.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{f.body}</p>
                 </Reveal>
               ))}
@@ -209,9 +269,18 @@ export default function Home() {
                 const def = VERTICAL_DEFS[v as Vertical];
                 return (
                   <Reveal key={v} delay={i * 60} className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-accent-300 hover:shadow-md">
-                    <span className="mt-0.5 h-8 w-1.5 shrink-0 rounded-full bg-slate-200 transition group-hover:bg-accent-500" />
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-600 ring-1 ring-accent-100">
+                      {tradeIcons[v as Vertical]}
+                    </span>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">{def.label}</div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">
+                        {def.label}
+                        {v === "auto" && (
+                          <span className="rounded-full bg-accent-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent-700 ring-1 ring-accent-100">
+                            Where we started
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-1 text-xs text-slate-500">{def.tagline}</div>
                     </div>
                   </Reveal>
@@ -353,6 +422,18 @@ export default function Home() {
             <Link href="/privacy" className="hover:text-slate-800">Privacy</Link>
             <Link href="/sms-opt-in" className="hover:text-slate-800">Text alerts</Link>
             <span>© {new Date().getFullYear()} Switchboard</span>
+            {/* Parent-brand credit. Switchboard is a product inside Handoff,
+                not the parent. Becomes a link once the Handoff domain exists —
+                set HANDOFF_URL below and nothing else changes. */}
+            <span>
+              {HANDOFF_URL ? (
+                <a href={HANDOFF_URL} className="hover:text-slate-800">
+                  A Handoff product · built by Dwayne Brown, Jr.
+                </a>
+              ) : (
+                <>A Handoff product · built by Dwayne Brown, Jr.</>
+              )}
+            </span>
           </div>
         </div>
       </footer>

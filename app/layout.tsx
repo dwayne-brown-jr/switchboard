@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "Switchboard — Never miss another call",
   description:
-    "A friendly AI receptionist for your shop. It answers every call, books jobs on your calendar, and texts you the emergencies — set up in minutes.",
+    "A friendly AI receptionist for your shop. It answers every call, books jobs on your calendar, and texts you the emergencies. Built in North County San Diego.",
 };
 
 export default function RootLayout({

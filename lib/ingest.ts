@@ -16,6 +16,23 @@ export type ShopWithOwner = Shop & { owner: { email: string } | null };
 export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
   const existing = await prisma.callRecord.findUnique({ where: { callId: p.call_id }, select: { id: true } });
 
+  // Customer layer: resolve the caller to a Customer before writing, so the
+  // link lands in the same upsert rather than needing a second write. Safe by
+  // construction — returns null on an unnormalizable number (blocked caller ID)
+  // and never throws, because losing a CallRecord to a CRM failure would be a
+  // far worse trade than losing the link. Both this path and the mid-call
+  // create_booking path upsert on CustomerPhone's unique index, so whichever
+  // arrives first wins and the other resolves to the same customer.
+  const { resolveCustomerSafe, refreshRollupsSafe } = await import("./customer");
+  const customer = await resolveCustomerSafe(shop.id, p.caller_phone, { at: new Date(p.timestamp) });
+
+  // Applied to create AND update, but only when we actually resolved someone.
+  // This upsert re-runs on every webhook retry, so writing `customerId: null`
+  // on a miss would let one transient resolution failure — or one call from a
+  // number we can't normalize — erase a link a previous run or the backfill had
+  // already established. Absence of a customer is not evidence there isn't one.
+  const linkage = customer ? { customerId: customer.id } : {};
+
   const data = {
     shopId: shop.id,
     timestamp: new Date(p.timestamp),
@@ -38,9 +55,13 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
 
   const record = await prisma.callRecord.upsert({
     where: { callId: p.call_id },
-    create: { callId: p.call_id, ...data },
-    update: data,
+    create: { callId: p.call_id, ...data, ...linkage },
+    update: { ...data, ...linkage },
   });
+
+  // Rollups after the write, so callCount/lifetimeValue/stage reflect this call.
+  // Best-effort: the nightly customer-rollups job repairs any drift.
+  await refreshRollupsSafe(customer?.id);
 
   // Forwarding self-verify: while a shop is still onboarding, an inbound call
   // during an active forwarding-verification window IS the proof that call

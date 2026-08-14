@@ -144,6 +144,8 @@ model Shop {
   calls    CallRecord[]
   bookings Booking[]
   auditLogs AuditLog[]
+  customers Customer[]
+  followUpRules FollowUpRule[]
 }
 
 // Appointments we own. Switchboard computes availability from the shop's hours
@@ -160,12 +162,26 @@ model Booking {
   service       String?
   customerName  String?
   customerPhone String?
-  status        String   @default("confirmed") // confirmed | canceled
+  status        String   @default("confirmed") // confirmed | completed | canceled | no_show
   source        String   @default("agent") // agent | manual
   callId        String? // the call that created it, if any
   createdAt     DateTime @default(now())
 
+  // Customer layer. Nullable: a booking whose phone can't be normalized to E.164
+  // (blocked/withheld caller ID) stays unlinked rather than being forced onto a
+  // wrong customer. See lib/customer.ts.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  assetId    String?
+  asset      CustomerAsset? @relation(fields: [assetId], references: [id])
+  // ACTUAL job value in CENTS, once the work is done — distinct from the
+  // *estimated* CallRecord.estJobValue (whole dollars, from the AI's post-call
+  // analysis). All new money fields are cents; lib/customer.ts owns the one
+  // conversion at that boundary.
+  valueCents Int?
+
   @@index([shopId, startUtc])
+  @@index([customerId])
 }
 
 model AgentVersion {
@@ -227,6 +243,167 @@ model CallRecord {
   transcript    String? // full transcript text
   handledAt     DateTime? // owner marked this call's follow-up as done (mobile app)
   flags         Json?
+
+  // Customer layer. Nullable — anonymous calls (blocked caller ID, or a number
+  // toE164 can't confidently normalize) are real data and stay unlinked.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, timestamp])
+}
+
+// ---------------------------------------------------------------------------
+// Customer layer (CRM). See docs/CRM-PLAN.md.
+//
+// The rest of the schema is event-shaped: CallRecord and Booking are flat rows
+// hanging off a Shop, with no entity representing the person on the other end
+// of the phone. Customer is that entity — the spine the relationship data hangs
+// off, so two calls six months apart are one customer instead of two rows.
+// ---------------------------------------------------------------------------
+model Customer {
+  id     String @id @default(cuid())
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id])
+
+  displayName String? // best-known name; what the agent and owner see
+  firstName   String?
+  lastName    String?
+  email       String?
+  addressLine String?
+  city        String?
+  postalCode  String?
+  notes       String? // freeform owner notes
+
+  stage  String @default("lead") // lead | active | dormant | lost
+  source String @default("agent") // agent | manual | import
+
+  // Customer-directed messaging consent. Deliberately SEPARATE from
+  // Shop.smsConsentAt/smsOptOut, which govern texting the *owner* (who signed
+  // up). Texting a shop's customers is a different legal posture and likely a
+  // different A2P campaign — see docs/CRM-PLAN.md §5 before sending anything.
+  smsConsentAt DateTime?
+  smsOptOut    Boolean   @default(false)
+  doNotContact Boolean   @default(false)
+
+  // Denormalized rollups — recomputed on write inside the triggering
+  // transaction, plus a nightly reconciliation job that repairs drift.
+  firstSeenAt   DateTime @default(now())
+  lastContactAt DateTime @default(now())
+  callCount     Int      @default(0)
+  bookingCount  Int      @default(0)
+  noShowCount   Int      @default(0)
+  lifetimeValue Int      @default(0) // CENTS
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  phones    CustomerPhone[]
+  assets    CustomerAsset[]
+  tags      CustomerTag[]
+  events    CustomerEvent[]
+  calls     CallRecord[]
+  bookings  Booking[]
+  followUps FollowUpTask[]
+
+  @@index([shopId, lastContactAt])
+  @@index([shopId, stage])
+}
+
+// Identity resolution. A child table rather than a `phone` column on Customer
+// because shops routinely have one customer calling from a cell, a work line,
+// and a spouse's phone — and because @@unique([shopId, phoneE164]) lets ingest
+// resolve by upsert instead of read-then-write, which is what makes the
+// mid-call create_booking path and the post-call webhook converge on the same
+// row no matter which lands first.
+model CustomerPhone {
+  id         String   @id @default(cuid())
+  shopId     String // denormalized so the unique index is tenant-scoped
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  phoneE164  String
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([shopId, phoneE164])
+  @@index([customerId])
+}
+
+// The thing being serviced. Verticals differ (vehicle / property / equipment)
+// but the shape doesn't, so this is one polymorphic table rather than six
+// vertical-specific ones.
+model CustomerAsset {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kind       String // vehicle | property | equipment
+  label      String // "2018 Silverado" | "412 Oak St" | "Carrier 3-ton"
+  attrs      Json? // { year, make, model, vin, plate } | { sqft, systemType, installedYear }
+  createdAt  DateTime @default(now())
+
+  bookings Booking[]
+
+  @@index([customerId])
+}
+
+model CustomerTag {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String
+
+  @@unique([customerId, label])
+  @@index([label])
+}
+
+// The non-call, non-booking half of the timeline. Calls and bookings already
+// have their own tables and are unioned in at read time (no write
+// amplification, no sync bugs); this holds only what has no home today.
+model CustomerEvent {
+  id         String   @id @default(cuid())
+  shopId     String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  kind       String // note | stage_change | tag | sms_sent | email_sent | followup_done | merged
+  body       String?
+  detail     Json?
+  actorId    String? // user id, or null for system
+  createdAt  DateTime @default(now())
+
+  @@index([customerId, createdAt])
+}
+
+// Follow-up engine (Phase D). Schema lands now so the customer layer is
+// complete; the send path is gated on A2P — see docs/CRM-PLAN.md §5.
+model FollowUpRule {
+  id         String   @id @default(cuid())
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id])
+  trigger    String // call_unbooked | booking_completed | no_show | dormant
+  delayHours Int
+  channel    String // sms | email | task
+  template   String // supports {{firstName}}, {{service}}, {{shopName}}
+  enabled    Boolean  @default(false) // OFF by default; owner opts in per rule
+  createdAt  DateTime @default(now())
+
+  @@index([shopId, trigger])
+}
+
+model FollowUpTask {
+  id         String    @id @default(cuid())
+  shopId     String
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  ruleId     String?
+  callId     String?
+  dueAt      DateTime
+  channel    String // sms | email | task
+  body       String
+  status     String    @default("pending") // pending | sent | done | skipped | failed
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([shopId, status, dueAt])
+  @@index([customerId])
 }
 
 model WebhookEvent {

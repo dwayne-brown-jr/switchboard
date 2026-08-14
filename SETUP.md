@@ -66,6 +66,12 @@ console (Schedules → Create) pointing at your deployed app:
   Emails owners: escalating past-due dunning (day 3 + day 7; day 1 fires live) and
   a one-time nudge to anyone stalled mid-onboarding past `ONBOARDING_NUDGE_DAYS`
   (default 2). Never pauses service — cancellation is the only hard stop.
+- **Customer rollups** — cron `30 8 * * *` (daily 8:30am UTC) → `POST {APP_URL}/api/jobs/customer-rollups`
+  Reconciles customer call/booking counts, lifetime value and stage against the
+  source rows. The live paths refresh these inline but best-effort (a CRM write
+  must never fail a call), so drift is expected. One transition is only ever
+  possible here: a customer going **dormant** happens by the passage of time, and
+  nothing writes on the day it happens.
 
 The A2P-poll and forwarding-timeout jobs are scheduled automatically by the app
 when those steps run; they only fire once the app is reachable at a public URL

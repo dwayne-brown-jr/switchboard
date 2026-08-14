@@ -25,6 +25,10 @@ const DESIRED = [
   { cron: "0 15 * * *", path: "/api/jobs/health-check" },
   { cron: "0 16 * * *", path: "/api/jobs/reminders" },
   { cron: "0 8 * * *", path: "/api/jobs/usage-sweep" },
+  // Runs after usage-sweep, off-peak. Reconciles customer rollups and is the
+  // only thing that can ever move a customer to "dormant" — that transition
+  // happens by the passage of time, so no write triggers it.
+  { cron: "30 8 * * *", path: "/api/jobs/customer-rollups" },
 ];
 
 const auth = { Authorization: `Bearer ${token}` };

@@ -92,6 +92,16 @@ const steps = [
   { n: "04", title: "It answers while you work", body: "Every call your team can't get to is picked up, answered, and booked — and the emergencies get texted straight to you." },
 ];
 
+// The problem, stat-led. Every number is checkable: the 62% is 411 Locals'
+// published study (same source the ROI calculator footnote cites), the $6,300
+// is the calculator's own defaults (2 missed/day × 30% booked × $420 × 25
+// working days), and the 24/7 is the product.
+const problemStats = [
+  { n: "62%", body: "of calls to small businesses go unanswered (411 Locals). Not because owners don't care — because they're working." },
+  { n: "$6,300/mo", body: "walks out the door at just 2 missed calls a day. That's the calculator's math below — run it with your own numbers." },
+  { n: "24/7", body: "is when Switchboard picks up — nights, weekends, and mid-job, from the first day you forward a call." },
+];
+
 const features = [
   { icon: "phone", title: "Answers every call", body: "Nights, weekends, or when you're heads-down on a job — a friendly voice picks up on the first ring, every time." },
   { icon: "calendar", title: "Books the job", body: "It knows your services and hours, offers real openings, and drops the appointment straight onto your calendar." },
@@ -121,6 +131,21 @@ export default function Home() {
 
   return (
     <div className="min-h-full">
+      {/* Announcement bar — the pilot is the news. Scrolls to the pilot strip;
+          remove this bar when the pilot slots fill. */}
+      <ScrollLink
+        href="#pilot"
+        className="block bg-slate-900 px-4 py-2 text-center text-[13px] font-medium text-slate-200 transition hover:text-white"
+      >
+        <span className="hidden sm:inline">
+          Local to North County San Diego? We&apos;re taking a few shops for a free 30-day pilot{" "}
+          <span className="font-semibold text-accent-400">— ask about it →</span>
+        </span>
+        <span className="sm:hidden">
+          Free 30-day pilot for North County shops <span className="font-semibold text-accent-400">— ask →</span>
+        </span>
+      </ScrollLink>
+
       {/* Sticky glass header */}
       <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
@@ -139,32 +164,34 @@ export default function Home() {
       </header>
 
       <main>
-        {/* Hero — also the #demo anchor, since the live demo now lives here */}
-        <section id="demo" className="relative scroll-mt-16 overflow-hidden">
-          <div className="mesh pointer-events-none absolute inset-0" />
-          <div className="dot-grid pointer-events-none absolute inset-0" />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:py-28">
+        {/* Hero — a framed dark panel inset on the white page. Dark is where
+            the product speaks; the white sections after it carry the evidence.
+            Also the #demo anchor, since the live demo lives here. */}
+        <section id="demo" className="scroll-mt-16 px-3 pt-3 sm:px-5 sm:pt-5">
+          <div className="relative overflow-hidden rounded-3xl bg-slate-900">
+            <div className="mesh pointer-events-none absolute inset-0 opacity-90" />
+            <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 sm:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:py-24">
             <div>
-              <div className="rise inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 backdrop-blur" style={{ animationDelay: "0ms" }}>
+              <div className="rise inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200 ring-1 ring-white/20 backdrop-blur" style={{ animationDelay: "0ms" }}>
                 <span className="relative inline-flex h-2 w-2 text-accent-500">
                   <span className="ping-ring absolute inline-flex h-2 w-2 rounded-full" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-accent-500" />
                 </span>
                 For local service businesses that live on the phone
               </div>
-              <h1 className="rise mt-5 max-w-2xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl" style={{ animationDelay: "80ms" }}>
+              <h1 className="rise mt-5 max-w-2xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl" style={{ animationDelay: "80ms" }}>
                 An answering service takes a message.{" "}
-                <span className="text-accent-600">Switchboard books the job.</span>
+                <span className="text-accent-500">Switchboard books the job.</span>
               </h1>
-              <p className="rise mt-6 max-w-xl text-lg leading-8 text-slate-600" style={{ animationDelay: "160ms" }}>
+              <p className="rise mt-6 max-w-xl text-lg leading-8 text-slate-300" style={{ animationDelay: "160ms" }}>
                 A friendly AI receptionist answers every call 24/7, books straight onto your calendar, and texts you the
                 urgent ones. Try it right now — no sign-up.
               </p>
               <div className="rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "240ms" }}>
                 <Link href="/login" className="btn-accent px-5 py-3 text-base">Set up my receptionist</Link>
-                <ScrollLink href="#pricing" className="btn-secondary px-5 py-3 text-base">See pricing</ScrollLink>
+                <ScrollLink href="#pricing" className="btn border border-white/20 bg-white/10 px-5 py-3 text-base text-white hover:bg-white/20">See pricing</ScrollLink>
               </div>
-              <div className="rise mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500" style={{ animationDelay: "320ms" }}>
+              <div className="rise mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-300" style={{ animationDelay: "320ms" }}>
                 {["Keep your current number", "Answers 24/7", "Go live the same day"].map((t) => (
                   <span key={t} className="inline-flex items-center gap-1.5">
                     <span className="text-accent-500">✓</span> {t}
@@ -176,7 +203,7 @@ export default function Home() {
                 animation below the fold. Visitors talk to the product before
                 they read a single feature. */}
             <div className="rise" style={{ animationDelay: "300ms" }}>
-              <div className="rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-xl shadow-brand-500/5 backdrop-blur sm:p-6">
+              <div className="rounded-3xl bg-white/95 p-5 shadow-2xl shadow-black/25 backdrop-blur sm:p-6">
                 <div className="mb-4 flex items-center gap-2">
                   <span className="relative inline-flex h-2 w-2 text-accent-500">
                     <span className="ping-ring absolute inline-flex h-2 w-2 rounded-full" />
@@ -190,14 +217,34 @@ export default function Home() {
               </div>
             </div>
           </div>
+          </div>
         </section>
 
         {/* Proof band — sits where a logo wall goes once there are customers */}
         <TrustBand />
 
+        {/* What missed calls cost — big numbers over hairline rules. The dark
+            hero says what Switchboard is; this section is the evidence. */}
+        <section>
+          <div className="mx-auto max-w-6xl px-6 py-16">
+            <Reveal>
+              <Eyebrow>The problem</Eyebrow>
+              <h2 className="mt-2 font-display text-3xl font-bold text-slate-900 sm:text-4xl">What missed calls cost</h2>
+            </Reveal>
+            <div className="mt-10 grid gap-x-8 gap-y-10 sm:grid-cols-3">
+              {problemStats.map((s, i) => (
+                <Reveal key={s.n} delay={i * 90} className="border-t border-slate-300 pt-5">
+                  <p className="font-display text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">{s.n}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{s.body}</p>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* North County pilot — deliberately quieter than the main sections.
             Free 30-day pilot for local shops; remove once the slots fill. */}
-        <section className="border-b border-slate-200 bg-slate-50/60">
+        <section id="pilot" className="scroll-mt-16 border-b border-slate-200 bg-slate-50/60">
           <div className="mx-auto max-w-3xl px-6 py-10 text-center">
             <Reveal>
               <h2 className="font-display text-lg font-bold text-slate-900">Local to North County San Diego?</h2>

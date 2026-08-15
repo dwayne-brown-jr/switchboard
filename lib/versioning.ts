@@ -4,6 +4,7 @@ import { prisma } from "./db";
 import { generateConfig, generatePrompt, qaReview } from "./llm";
 import { wizardSchema, type WizardData, type ShopConfig, type QaResult } from "./schemas";
 import { getVoiceProvider } from "./integrations/voice";
+import { agentFunctions, agentBaseUrl } from "./integrations/agentTools";
 import { toE164 } from "./phone";
 import { logAudit } from "./audit";
 
@@ -77,11 +78,32 @@ export async function publishVersion(shopId: string, versionId: string, actorId?
 
   const config = version.config as unknown as ShopConfig;
 
-  // Update the live agent (voice + prompt) via the provider.
+  // Update the live agent (voice + prompt + tools) via the provider.
   if (shop.agentId && shop.agentProvider) {
     const provider = getVoiceProvider(shop.agentProvider);
+
+    // Re-sync the tool list on every publish, not just at provisioning.
+    //
+    // Tools are defined in code, so a shop provisioned before a tool existed
+    // would otherwise never receive it — while the prompt, which IS regenerated
+    // here, starts telling the agent to call it. That mismatch is worse than
+    // not shipping the tool at all: `lookup_customer` instructs the agent to
+    // look the caller up before greeting them, and an agent reaching for a tool
+    // its provider doesn't have is exactly the dead air the feature exists to
+    // avoid.
+    //
+    // Only when we have a public HTTPS base — otherwise the URLs would point at
+    // localhost. Omitting the key entirely leaves the live tools untouched
+    // rather than clearing them.
+    const publicApp = Boolean(agentBaseUrl());
+
     await provider
-      .updateAgent(shop.agentId, { systemPrompt: version.systemPrompt, voice: config.voice, greeting: config.greeting ?? "" })
+      .updateAgent(shop.agentId, {
+        systemPrompt: version.systemPrompt,
+        voice: config.voice,
+        greeting: config.greeting ?? "",
+        ...(publicApp ? { functions: agentFunctions(shop.id) } : {}),
+      })
       .catch((e) => {
         throw new Error(`Couldn't update your live receptionist: ${(e as Error).message}`);
       });

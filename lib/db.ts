@@ -27,6 +27,18 @@ function createClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createClient();
+// The globalThis cache exists so Next's dev hot-reload doesn't open a fresh
+// connection pool on every edit.
+//
+// Under vitest it does the exact opposite of its job. Each DB-backed test file
+// builds its own temp database and points DATABASE_URL at it before importing
+// this module — but a client cached on globalThis by an EARLIER test file
+// ignores that entirely and keeps writing to the first file's database. The
+// symptom is baffling: the second file to run fails seeding with a unique
+// constraint violation, because the rows it's creating are already there.
+// So under test, always build a client for the URL we were actually given.
+const isTest = Boolean(process.env.VITEST);
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = (!isTest && globalForPrisma.prisma) || createClient();
+
+if (!isTest && process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

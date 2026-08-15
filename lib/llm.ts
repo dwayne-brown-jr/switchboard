@@ -148,7 +148,7 @@ export async function generatePrompt(config: ShopConfig): Promise<string> {
   try {
     const system =
       "You lightly polish a phone-receptionist script for readability. You MUST keep every " +
-      "section header (ROLE, DISCLOSURE, WHAT YOU KNOW, RULES, BOOKING FLOW, ESCALATION, HANDING OFF TO A PERSON, CLOSING) " +
+      "section header (ROLE, DISCLOSURE, WHAT YOU KNOW, RULES, BOOKING FLOW, ESCALATION, RETURNING CALLER, HANDING OFF TO A PERSON, CLOSING) " +
       "and MUST keep all safety rules and numbers exactly. Do not add or remove rules. Return only the script.";
     const polished = await complete({
       system,
@@ -162,7 +162,20 @@ export async function generatePrompt(config: ShopConfig): Promise<string> {
   }
 }
 
-const REQUIRED_SECTIONS = ["ROLE", "DISCLOSURE", "WHAT YOU KNOW", "RULES", "BOOKING FLOW", "ESCALATION", "HANDING OFF TO A PERSON", "CLOSING"];
+// RETURNING CALLER is in here because it carries privacy rules ("never read
+// back anything beyond their first name"), so a polish pass that drops it is a
+// safety regression, not a cosmetic one — same reasoning as DISCLOSURE.
+const REQUIRED_SECTIONS = [
+  "ROLE",
+  "DISCLOSURE",
+  "WHAT YOU KNOW",
+  "RULES",
+  "BOOKING FLOW",
+  "ESCALATION",
+  "RETURNING CALLER",
+  "HANDING OFF TO A PERSON",
+  "CLOSING",
+];
 
 function hasAllSections(text: string): boolean {
   return REQUIRED_SECTIONS.every((s) => text.includes(s));
@@ -201,8 +214,26 @@ export function fillTemplate(config: ShopConfig): string {
     .replaceAll("{HOT_JOBS}", hotJobsText)
     .replaceAll("{BOOKING_FIELDS}", bookingFieldsText)
     .replaceAll("{ESCALATION_PHONE}", config.escalation.alert_number ?? "the shop owner");
-  return filled + HANDOFF_SECTION;
+  return filled + RETURNING_CALLER_SECTION + HANDOFF_SECTION;
 }
+
+// Baked returning-caller guardrail (all verticals). Appended here rather than
+// written into each of the six templates so the behaviour — and the privacy
+// rules around it — can only ever be changed in one place.
+//
+// The failure this is written to prevent is dead air. A caller hears silence
+// long before they notice a missing personal touch, so every instruction below
+// biases toward greeting immediately and treating recognition as a bonus.
+const RETURNING_CALLER_SECTION = `
+
+RETURNING CALLER
+Before you greet the caller, call lookup_customer once with their caller ID. Never call it more than once, and never mention that you looked anything up.
+- If it returns known:false, or doesn't come back right away, just greet them normally as a new caller. Never wait in silence for it — greeting them late is worse than not recognising them.
+- If it returns a first name, greet them by it naturally, as a person who remembers them would: "Thanks for calling {BUSINESS_NAME}, is this <name>?"
+- If it returns a last service or a vehicle/property, you may reference it once, lightly, to save them explaining: "Is this about the <item> again?" Ask — never assume that's why they're calling.
+- If it returns an upcoming appointment, mention it before offering any new time, so you never double-book them.
+- If the caller says it isn't them, or that you have the wrong person, drop every detail immediately, apologise briefly, and carry on as a brand-new caller. Do not use the name again.
+- Never read back anything beyond their first name and the item being serviced. Never state their phone number, address, what they've spent, or how many times they've called — you cannot be certain who is holding the phone.`;
 
 // Baked handoff guardrail (all verticals). Keeps the agent handling routine
 // calls itself and only reaching a human when it truly can't — after capturing

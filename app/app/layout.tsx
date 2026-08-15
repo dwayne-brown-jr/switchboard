@@ -17,6 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Switchboard
           </Link>
           <div className="flex items-center gap-4 text-sm">
+            <Link href="/app/customers" className="text-slate-500 hover:text-slate-800">
+              Customers
+            </Link>
             <Link href="/app/settings" className="text-slate-500 hover:text-slate-800">
               Settings
             </Link>

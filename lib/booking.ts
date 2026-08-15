@@ -99,3 +99,54 @@ export async function createConfirmedBooking(args: {
   if (outcome.ok) await refreshRollupsSafe(customer?.id);
   return outcome;
 }
+
+/** The states a booking can end in, beyond the "confirmed" it starts in. */
+export const BOOKING_OUTCOMES = ["completed", "no_show", "canceled", "confirmed"] as const;
+export type BookingOutcomeStatus = (typeof BOOKING_OUTCOMES)[number];
+
+/**
+ * Close out a booking: mark it completed (optionally with the actual money it
+ * brought in), a no-show, or cancelled.
+ *
+ * This is the lifecycle that was missing when the customer layer shipped.
+ * `Booking.valueCents` and the `completed`/`no_show` statuses existed in the
+ * schema and were read by the rollups, but nothing anywhere ever wrote them —
+ * so `lifetimeValue` could only ever fall back to the voice provider's pre-job
+ * ESTIMATE, and `noShowCount` was structurally always zero. Without this, every
+ * money figure in the CRM is a guess the AI made before the work happened.
+ *
+ * Shop-scoped by construction: the update is keyed on BOTH id and shopId, so an
+ * owner can't close out another shop's booking by guessing an id.
+ */
+export async function setBookingOutcome(args: {
+  shopId: string;
+  bookingId: string;
+  status: BookingOutcomeStatus;
+  /** Actual value in CENTS. Only meaningful on "completed". */
+  valueCents?: number | null;
+}): Promise<{ ok: true; customerId: string | null } | { ok: false; reason: "not_found" }> {
+  const existing = await prisma.booking.findFirst({
+    where: { id: args.bookingId, shopId: args.shopId },
+    select: { id: true, customerId: true },
+  });
+  if (!existing) return { ok: false, reason: "not_found" };
+
+  // Value only belongs on a completed job. Moving a booking back to any other
+  // status clears it rather than leaving revenue attached to work that didn't
+  // happen — otherwise a mis-click stays in the lifetime total forever.
+  const valueCents =
+    args.status === "completed"
+      ? args.valueCents != null && Number.isFinite(args.valueCents) && args.valueCents >= 0
+        ? Math.round(args.valueCents)
+        : null
+      : null;
+
+  await prisma.booking.update({
+    where: { id: existing.id },
+    data: { status: args.status, valueCents },
+  });
+
+  const { refreshRollupsSafe } = await import("./customer");
+  await refreshRollupsSafe(existing.customerId);
+  return { ok: true, customerId: existing.customerId };
+}

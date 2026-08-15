@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { setupTestDb } from "../test/db-harness";
 
 // DB-backed tests for the customer layer.
 //
@@ -12,9 +9,10 @@ import path from "node:path";
 // those against a mock would only prove the mock agrees with itself.
 //
 // So this file builds a real SQLite database from the live schema in a temp
-// dir, points DATABASE_URL at it, and imports lib/customer.ts afterwards (the
-// prisma client in lib/db.ts reads the URL at module load, so the import has to
-// come second — hence the dynamic imports in beforeAll).
+// dir. The prisma client in lib/db.ts reads DATABASE_URL at module load, so
+// every app import has to come AFTER the harness redirects it — hence the
+// dynamic imports in beforeAll. test/db-harness.ts enforces that with a guard;
+// see the comment there for what happens when it isn't respected.
 
 let resolveCustomer: typeof import("./customer").resolveCustomer;
 let refreshRollups: typeof import("./customer").refreshRollups;
@@ -26,30 +24,13 @@ const SHOP_A = "shop_a";
 const SHOP_B = "shop_b";
 
 beforeAll(async () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "switchboard-crm-"));
-  const dbFile = path.join(dir, "test.db");
-
-  // Build the schema from prisma/schema.prisma itself rather than a checked-in
-  // snapshot, so these tests can never silently drift from the real model.
-  const ddl = execFileSync(
-    "npx",
-    ["prisma", "migrate", "diff", "--from-empty", "--to-schema-datamodel", "prisma/schema.prisma", "--script"],
-    { encoding: "utf8", cwd: process.cwd() },
-  );
-
-  const { createClient } = await import("@libsql/client");
-  const client = createClient({ url: `file:${dbFile}` });
-  await client.executeMultiple(ddl);
-  client.close();
-
-  process.env.DATABASE_URL = `file:${dbFile}`;
+  ({ prisma } = await setupTestDb("crm"));
 
   const customer = await import("./customer");
   resolveCustomer = customer.resolveCustomer;
   refreshRollups = customer.refreshRollups;
   reconcileRollups = customer.reconcileRollups;
   computeRollups = customer.computeRollups;
-  prisma = (await import("./db")).prisma;
 
   await prisma.user.create({
     data: { id: "u1", email: "owner@example.com", emailVerified: true },

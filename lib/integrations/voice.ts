@@ -21,7 +21,7 @@ export interface CreateAgentArgs {
 }
 
 export interface AgentFunction {
-  name: "check_availability" | "create_booking" | "notify_owner";
+  name: "lookup_customer" | "check_availability" | "create_booking" | "notify_owner";
   url: string;
   description: string;
   /** JSON-schema of the args the LLM should extract and send. */

@@ -19,6 +19,19 @@ export function agentFunctions(shopId: string): AgentFunction[] {
   const base = `${agentBaseUrl() ?? "http://localhost:3000"}/api/agent`;
   return [
     {
+      name: "lookup_customer",
+      url: `${base}/lookup-customer${q(shopId)}`,
+      description:
+        "Look up whether this caller has dealt with us before, using their caller ID. Call this ONCE at the very start, before greeting them. If it returns known:false, greet them normally as a new caller — never mention that you looked.",
+      parameters: {
+        type: "object",
+        properties: {
+          phone: { type: "string", description: "The caller's phone number (their caller ID), in any format." },
+        },
+        required: ["phone"],
+      },
+    },
+    {
       name: "check_availability",
       url: `${base}/check-availability${q(shopId)}`,
       description: "Check open appointment times for a service before offering the caller a time.",

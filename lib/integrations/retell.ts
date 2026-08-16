@@ -203,9 +203,22 @@ export function createRetellProvider(): VoiceProvider {
           ...(args.functions ? { general_tools: toRetellTools(args as CreateAgentArgs) } : {}),
         });
       }
-      if (args.voice) {
-        await api(`/update-agent/${agentId}`, "PATCH", { voice_id: voiceId(args.voice) });
-      }
+      // Re-sync everything defined in CODE rather than per-shop config, on every
+      // update — not just at provisioning.
+      //
+      // This is the second time the same shape of bug has bitten: tools were
+      // only sent at agent creation, so a shop provisioned before a tool existed
+      // never received it. post_call_analysis_data had exactly the same problem,
+      // and it's quieter — a missing analysis field doesn't error, it just means
+      // Retell never returns the value and the ingest code consuming it sits
+      // dead forever. (Found when `asset` capture shipped and Riverside's live
+      // agent still listed only the original nine fields.)
+      //
+      // Rule for anything added to POST_CALL_ANALYSIS or agentFunctions: it must
+      // be pushed here too, or it only ever reaches brand-new shops.
+      const agentPatch: Record<string, unknown> = { post_call_analysis_data: POST_CALL_ANALYSIS };
+      if (args.voice) agentPatch.voice_id = voiceId(args.voice);
+      await api(`/update-agent/${agentId}`, "PATCH", agentPatch);
     },
 
     // Retell has no explicit pause; unbinding the number stops inbound calls.

@@ -23,6 +23,16 @@ export const POST_CALL_ANALYSIS = [
   { type: "string", name: "service", description: "The service the caller booked or asked about, if any." },
   { type: "string", name: "appt_time", description: "The appointment time booked as ISO 8601, if any." },
   { type: "number", name: "est_job_value", description: "Estimated dollar value of the booked job as a whole number, else 0." },
+  // The agent asks year/make/model (or the property address) on nearly every
+  // call and we used to discard it, so a returning caller had to recite their
+  // vehicle every single time. Captured here it becomes a CustomerAsset, and
+  // the NEXT call can open with "still the Pathfinder?" — see lib/ingest.ts.
+  {
+    type: "string",
+    name: "asset",
+    description:
+      "The specific vehicle, property or equipment the call was about, normalized (e.g. '2016 Nissan Pathfinder', '412 Oak St', 'Carrier 3-ton AC'). Empty string if the caller never identified one.",
+  },
 ];
 
 // Our curated voice ids ARE real Retell voice ids (see lib/verticals.ts VOICES),

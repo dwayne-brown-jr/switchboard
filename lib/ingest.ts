@@ -53,6 +53,13 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
     flags: (p.flags as never) ?? undefined,
   };
 
+  // Remember what the call was about — the vehicle, property or unit. The agent
+  // asks for it on nearly every call and we used to throw it away, so a
+  // ten-year customer recited their own truck every time they rang. Once it's a
+  // CustomerAsset, lookup_customer can hand it back on the NEXT call.
+  // Best-effort and non-blocking: never risk a CallRecord over a nicety.
+  if (customer) await rememberAssetSafe(shop, customer.id, p.asset);
+
   const record = await prisma.callRecord.upsert({
     where: { callId: p.call_id },
     create: { callId: p.call_id, ...data, ...linkage },
@@ -124,6 +131,50 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
   return record;
 }
 
+/** Which kind of asset a shop services, so the label lands under the right icon. */
+export function assetKindFor(vertical: string | null): "vehicle" | "property" | "equipment" {
+  if (!vertical) return "property";
+  if (vertical.startsWith("auto")) return "vehicle";
+  if (vertical === "hvac") return "equipment";
+  return "property";
+}
+
+/**
+ * Record the vehicle/property a call was about, if we don't already have it.
+ *
+ * Deliberately conservative. The label comes from a voice model transcribing a
+ * phone call, so it is noisy by nature: we skip anything implausibly short or
+ * long, and match case-insensitively against what's on file so "2016 nissan
+ * pathfinder" doesn't become a second row next to "2016 Nissan Pathfinder".
+ * Getting a duplicate wrong is worse than missing one — the agent reads these
+ * back to the caller.
+ *
+ * Never throws: a CRM nicety must not endanger the call record.
+ */
+export async function rememberAssetSafe(
+  shop: { id: string; vertical: string | null },
+  customerId: string,
+  rawLabel: string | null | undefined,
+): Promise<void> {
+  try {
+    const label = rawLabel?.trim();
+    if (!label || label.length < 4 || label.length > 120) return;
+
+    const existing = await prisma.customerAsset.findMany({ where: { customerId }, select: { id: true, label: true } });
+    if (existing.some((a) => a.label.toLowerCase() === label.toLowerCase())) return;
+
+    // Cap it. A customer with six "vehicles" is transcription noise, not a
+    // fleet, and the agent should not be reading a list back to anyone.
+    if (existing.length >= 5) return;
+
+    await prisma.customerAsset.create({
+      data: { customerId, kind: assetKindFor(shop.vertical), label },
+    });
+  } catch (e) {
+    console.error("remember asset failed", e);
+  }
+}
+
 /** Map a Retell call-ended webhook body into our ingest payload shape. Mirrors
  *  what the old n8n "Map Call → Ingest" node did. Returns a raw object to be
  *  validated by callIngestSchema at the route. */
@@ -161,6 +212,7 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
     // the owner app (2-line summary beats a 4-minute recording).
     summary: (ca.call_summary as string) || null,
     transcript: (c.transcript as string) || null,
+    asset: (analysis.asset as string) || null,
     flags: analysis.flags ?? null,
   };
 }

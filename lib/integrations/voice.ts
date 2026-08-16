@@ -28,6 +28,13 @@ export interface AgentFunction {
   parameters?: { type: "object"; properties: Record<string, unknown>; required?: string[] };
 }
 
+/** What a provider currently has configured for an agent, for drift checking. */
+export interface AgentSnapshot {
+  toolNames: string[];
+  analysisFields: string[];
+  systemPrompt: string;
+}
+
 export interface VoiceProvider {
   readonly name: string;
   createAgent(args: CreateAgentArgs): Promise<{ agentId: string; number?: string }>;
@@ -37,6 +44,16 @@ export interface VoiceProvider {
   deleteAgent(agentId: string): Promise<void>;
   /** Update (or remove, when null) the live human-handoff transfer number. */
   updateTransferNumber?(agentId: string, number: string | null): Promise<void>;
+  /**
+   * Read back what the provider ACTUALLY has for this agent.
+   *
+   * Exists because config defined in code has twice reached only newly
+   * provisioned shops: tools, then post-call analysis fields, were both sent at
+   * creation and never on update. Nothing errored either time — the agent just
+   * quietly lacked a capability the code assumed it had. Without a way to read
+   * the live config, that class of bug is undetectable from inside the app.
+   */
+  describeAgent?(agentId: string): Promise<AgentSnapshot>;
 }
 
 /** The provider to use for NEW provisioning: Retell if keyed, else mock. */

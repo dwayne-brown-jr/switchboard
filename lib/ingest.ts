@@ -23,8 +23,15 @@ export async function recordCall(shop: ShopWithOwner, p: CallIngest) {
   // far worse trade than losing the link. Both this path and the mid-call
   // create_booking path upsert on CustomerPhone's unique index, so whichever
   // arrives first wins and the other resolves to the same customer.
+  // The name hint is what turns the customer list from a column of phone
+  // numbers into people. resolveCustomer only fills a name it doesn't already
+  // have, so a name the owner corrected by hand always wins over the voice
+  // model's transcription of it.
   const { resolveCustomerSafe, refreshRollupsSafe } = await import("./customer");
-  const customer = await resolveCustomerSafe(shop.id, p.caller_phone, { at: new Date(p.timestamp) });
+  const customer = await resolveCustomerSafe(shop.id, p.caller_phone, {
+    at: new Date(p.timestamp),
+    name: p.customer_name,
+  });
 
   // Applied to create AND update, but only when we actually resolved someone.
   // This upsert re-runs on every webhook retry, so writing `customerId: null`
@@ -213,6 +220,7 @@ export function mapRetellCall(clientId: string, body: unknown, valueMap: Record<
     summary: (ca.call_summary as string) || null,
     transcript: (c.transcript as string) || null,
     asset: (analysis.asset as string) || null,
+    customer_name: (analysis.customer_name as string) || null,
     flags: analysis.flags ?? null,
   };
 }

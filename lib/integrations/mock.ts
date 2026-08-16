@@ -15,5 +15,16 @@ export function createMockVoiceProvider(): VoiceProvider {
     async pauseAgent() {},
     async resumeAgent() {},
     async deleteAgent() {},
+    // Reports itself as perfectly in sync — the mock has no real config to
+    // drift from, and a dev environment shouldn't page anyone about it.
+    async describeAgent() {
+      const { agentFunctions } = await import("./agentTools");
+      const { POST_CALL_ANALYSIS } = await import("./retell");
+      return {
+        toolNames: agentFunctions("mock").map((f) => f.name),
+        analysisFields: POST_CALL_ANALYSIS.map((f) => f.name),
+        systemPrompt: "",
+      };
+    },
   };
 }

@@ -25,6 +25,10 @@ export interface CustomerListRow {
   lifetimeValue: number; // cents
   lastContactAt: Date;
   tags: string[];
+  /** What they drive / the property we service — the column that makes this
+   *  read as a customer record instead of a row of digits. */
+  asset: string | null;
+  lastService: string | null;
 }
 
 export interface ListOptions {
@@ -86,6 +90,16 @@ export async function listCustomers(
       include: {
         phones: { where: { isPrimary: true }, take: 1, select: { phoneE164: true } },
         tags: { select: { label: true }, orderBy: { label: "asc" } },
+        assets: { take: 1, orderBy: { createdAt: "desc" }, select: { label: true } },
+        // LAST service means the most recent one that has actually HAPPENED.
+        // Without the date bound this picked up a booking scheduled for next
+        // week and labelled it "last service", which reads as a completed job.
+        bookings: {
+          take: 1,
+          orderBy: { startUtc: "desc" },
+          where: { service: { not: null }, startUtc: { lt: new Date() } },
+          select: { service: true },
+        },
       },
     }),
     prisma.customer.count({ where }),
@@ -102,6 +116,8 @@ export async function listCustomers(
       lifetimeValue: c.lifetimeValue,
       lastContactAt: c.lastContactAt,
       tags: c.tags.map((t) => t.label),
+      asset: c.assets[0]?.label ?? null,
+      lastService: c.bookings[0]?.service ?? null,
     })),
     total,
   };
@@ -254,10 +270,69 @@ export async function getCustomerTimeline(shopId: string, customerId: string, ta
   return items.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, take);
 }
 
-/** Bookings still open for close-out (the "did this job happen?" queue). */
+export interface ServiceRecord {
+  id: string;
+  at: Date;
+  service: string | null;
+  status: string;
+  valueCents: number | null;
+  /** The vehicle/property, when the booking was tied to one. */
+  asset: string | null;
+}
+
+/**
+ * Work this customer has actually had done — the service history.
+ *
+ * Deliberately separate from the activity timeline. A shop owner asking "what
+ * have we done for this truck?" wants a short table of jobs, not a merged feed
+ * where three phone calls sit between two repairs. Calls are activity; jobs are
+ * history, and conflating them is what made the first version read as a call
+ * log rather than a customer record.
+ *
+ * Excludes `confirmed` bookings still in the future — those are upcoming, not
+ * history — but keeps past confirmed ones, since a job that happened and was
+ * never closed out is exactly what the owner needs to see and fix.
+ */
+export async function getServiceHistory(shopId: string, customerId: string): Promise<ServiceRecord[]> {
+  const now = new Date();
+  const rows = await prisma.booking.findMany({
+    where: {
+      shopId,
+      customerId,
+      OR: [{ status: { in: ["completed", "no_show"] } }, { status: "confirmed", startUtc: { lt: now } }],
+    },
+    orderBy: { startUtc: "desc" },
+    include: { asset: { select: { label: true } } },
+  });
+  return rows.map((b) => ({
+    id: b.id,
+    at: b.startUtc,
+    service: b.service,
+    status: b.status,
+    valueCents: b.valueCents,
+    asset: b.asset?.label ?? null,
+  }));
+}
+
+/** The next appointment on the books, if any. */
+export async function getUpcomingBooking(shopId: string, customerId: string) {
+  return prisma.booking.findFirst({
+    where: { shopId, customerId, status: "confirmed", startUtc: { gte: new Date() } },
+    orderBy: { startUtc: "asc" },
+  });
+}
+
+/**
+ * Appointments whose time has PASSED but were never closed out — the
+ * "did this job actually happen?" queue.
+ *
+ * Scoped to the past on purpose. An appointment three days from now isn't
+ * pending a decision, and putting it in a list headed "close these out" asks
+ * the owner to say whether work happened that hasn't happened yet.
+ */
 export async function getOpenBookings(shopId: string, customerId: string) {
   return prisma.booking.findMany({
-    where: { shopId, customerId, status: "confirmed" },
+    where: { shopId, customerId, status: "confirmed", startUtc: { lt: new Date() } },
     orderBy: { startUtc: "asc" },
   });
 }

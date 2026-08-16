@@ -34,13 +34,22 @@ export async function getStats(shopId: string, period: Period): Promise<Dashboar
   };
 }
 
+/**
+ * The recent-calls feed. Includes the resolved customer so the dashboard can
+ * show a name instead of a phone number and link through to the profile —
+ * otherwise the dashboard and the CRM are two products sharing a database.
+ */
 export async function getRecentCalls(shopId: string, take = 25) {
-  return prisma.callRecord.findMany({
+  const rows = await prisma.callRecord.findMany({
     where: { shopId },
     orderBy: { timestamp: "desc" },
     take,
+    include: { customer: { select: { displayName: true } } },
   });
+  return rows.map((r) => ({ ...r, customerName: r.customer?.displayName ?? null }));
 }
+
+export type RecentCall = Awaited<ReturnType<typeof getRecentCalls>>[number];
 
 export function formatMoney(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");

@@ -55,6 +55,51 @@ export async function setStage(customerId: string, stage: string): Promise<Resul
   return { ok: true };
 }
 
+/**
+ * Edit the identity fields on a customer.
+ *
+ * Until this existed the customer list was 92 phone numbers and one name, with
+ * no way to fix that — names only ever arrived from a booking. An owner who
+ * knows perfectly well who +1760… is had no way to say so.
+ *
+ * An owner-set name is authoritative: `resolveCustomer` only fills a name it
+ * doesn't already have, so a correction here is never overwritten by the voice
+ * model's transcription on the next call.
+ */
+export async function updateProfile(
+  customerId: string,
+  fields: { displayName?: string; email?: string; addressLine?: string; city?: string; postalCode?: string },
+): Promise<Result> {
+  const c = await ownedCustomer(customerId);
+  if (!c) return { ok: false, error: "Customer not found." };
+
+  const clean = (v: string | undefined, max: number) => {
+    if (v === undefined) return undefined;
+    const t = v.trim().slice(0, max);
+    return t || null;
+  };
+
+  const displayName = clean(fields.displayName, 120);
+  const data: Record<string, string | null> = {};
+  if (displayName !== undefined) {
+    data.displayName = displayName;
+    // Keep first/last in step with the display name, since first_name is what
+    // the agent greets callers with.
+    const parts = (displayName ?? "").trim().split(/\s+/).filter(Boolean);
+    data.firstName = parts[0] ?? null;
+    data.lastName = parts.length > 1 ? parts.slice(1).join(" ") : null;
+  }
+  for (const k of ["email", "addressLine", "city", "postalCode"] as const) {
+    const v = clean(fields[k], k === "email" ? 200 : 160);
+    if (v !== undefined) data[k] = v;
+  }
+  if (Object.keys(data).length === 0) return { ok: true };
+
+  await prisma.customer.update({ where: { id: c.id }, data });
+  revalidate(customerId);
+  return { ok: true };
+}
+
 export async function saveNote(customerId: string, notes: string): Promise<Result> {
   const c = await ownedCustomer(customerId);
   if (!c) return { ok: false, error: "Customer not found." };

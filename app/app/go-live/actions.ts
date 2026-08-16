@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { requireShopId } from "@/lib/shop";
 import { completeUserStep } from "@/lib/engine";
 import { notifyAdmins } from "@/lib/notify";
 import { logAudit } from "@/lib/audit";
@@ -10,8 +11,9 @@ import { setCarrier, startVerification, markVerified, getForwardingState } from 
 import { submitA2P as doSubmitA2P, skipA2P as doSkipA2P } from "@/lib/a2p";
 import type { A2PBusinessInfo } from "@/lib/integrations/twilio";
 
-async function ownerShop(userId: string) {
-  const shop = await prisma.shop.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: "asc" }, include: { run: true } });
+async function ownerShop(_userId: string) {
+  const id = await requireShopId();
+  const shop = await prisma.shop.findUnique({ where: { id }, include: { run: true } });
   if (!shop?.run) throw new Error("No setup in progress.");
   return shop;
 }

@@ -144,6 +144,10 @@ export const callIngestSchema = z.object({
   // The vehicle/property the call was about, from post-call analysis. Becomes a
   // CustomerAsset so returning callers don't have to recite it again.
   asset: z.string().optional().nullable(),
+  // The caller's own name, from post-call analysis. Before this, names arrived
+  // only via a booking, so anyone who rang to ask a question stayed a phone
+  // number forever and the customer list read as a list of digits.
+  customer_name: z.string().optional().nullable(),
   flags: z.any().optional(),
 });
 

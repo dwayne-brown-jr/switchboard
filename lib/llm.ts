@@ -165,7 +165,10 @@ export async function generatePrompt(config: ShopConfig): Promise<string> {
 // RETURNING CALLER is in here because it carries privacy rules ("never read
 // back anything beyond their first name"), so a polish pass that drops it is a
 // safety regression, not a cosmetic one — same reasoning as DISCLOSURE.
-const REQUIRED_SECTIONS = [
+// Exported so the agent-drift check asserts against the SAME list the QA gate
+// uses. Two copies of "which sections must exist" would drift apart, and the
+// drift checker silently agreeing with a stale copy is worse than no checker.
+export const REQUIRED_PROMPT_SECTIONS = [
   "ROLE",
   "DISCLOSURE",
   "WHAT YOU KNOW",
@@ -178,7 +181,7 @@ const REQUIRED_SECTIONS = [
 ];
 
 function hasAllSections(text: string): boolean {
-  return REQUIRED_SECTIONS.every((s) => text.includes(s));
+  return REQUIRED_PROMPT_SECTIONS.every((s) => text.includes(s));
 }
 
 export function fillTemplate(config: ShopConfig): string {

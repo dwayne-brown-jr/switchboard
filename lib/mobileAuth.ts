@@ -41,6 +41,11 @@ export async function requireMobileUser(req: Request): Promise<MobileAuth | null
   // Touch last-seen without blocking the request.
   prisma.deviceToken.update({ where: { id: deviceId }, data: { lastSeenAt: new Date() } }).catch(() => {});
 
+  // Same "oldest shop wins" rule as lib/shop.currentShopId, but it can't call
+  // that helper: this path authenticates a DEVICE TOKEN, not a session, and
+  // currentShopId goes through requireUser(). When the multi-shop switcher
+  // lands, this needs the same treatment — the app has to be told which shop
+  // the owner picked rather than assuming their first.
   const shop = await prisma.shop.findFirst({ where: { ownerId: device.userId }, orderBy: { createdAt: "asc" } });
   return { user: { id: device.user.id, email: device.user.email, name: device.user.name }, shop, deviceId };
 }

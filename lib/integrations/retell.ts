@@ -33,6 +33,15 @@ export const POST_CALL_ANALYSIS = [
     description:
       "The specific vehicle, property or equipment the call was about, normalized (e.g. '2016 Nissan Pathfinder', '412 Oak St', 'Carrier 3-ton AC'). Empty string if the caller never identified one.",
   },
+  // Without this the customer list is a list of phone numbers. Names only ever
+  // arrived via a booking, so a caller who rang to ask a question stayed
+  // anonymous forever even after introducing themselves.
+  {
+    type: "string",
+    name: "customer_name",
+    description:
+      "The caller's own name if they gave it, properly capitalized (e.g. 'Samantha Reed'). Empty string if they never said it. Never guess, and never use the name of a person they are calling about.",
+  },
 ];
 
 // Our curated voice ids ARE real Retell voice ids (see lib/verticals.ts VOICES),
@@ -219,6 +228,23 @@ export function createRetellProvider(): VoiceProvider {
       const agentPatch: Record<string, unknown> = { post_call_analysis_data: POST_CALL_ANALYSIS };
       if (args.voice) agentPatch.voice_id = voiceId(args.voice);
       await api(`/update-agent/${agentId}`, "PATCH", agentPatch);
+    },
+
+    async describeAgent(agentId) {
+      const agent = await api<{
+        response_engine?: { llm_id?: string };
+        metadata?: { llm_id?: string };
+        post_call_analysis_data?: { name: string }[];
+      }>(`/get-agent/${agentId}`, "GET");
+      const llmId = agent.response_engine?.llm_id ?? agent.metadata?.llm_id;
+      const llm = llmId
+        ? await api<{ general_tools?: { name: string }[]; general_prompt?: string }>(`/get-retell-llm/${llmId}`, "GET")
+        : {};
+      return {
+        toolNames: (llm.general_tools ?? []).map((t) => t.name),
+        analysisFields: (agent.post_call_analysis_data ?? []).map((f) => f.name),
+        systemPrompt: llm.general_prompt ?? "",
+      };
     },
 
     // Retell has no explicit pause; unbinding the number stops inbound calls.

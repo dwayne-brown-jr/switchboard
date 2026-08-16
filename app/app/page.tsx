@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import { currentShopId } from "@/lib/shop";
 import { prisma } from "@/lib/db";
 import type { ShopConfig, QaFlag } from "@/lib/schemas";
 import { MeetReceptionist } from "./meet-receptionist";
@@ -11,10 +12,10 @@ import { UsageMeter } from "./usage-meter";
 import { openBillingPortal } from "./subscribe/actions";
 
 export default async function AppHome({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  const user = await requireUser();
-  const shop = await prisma.shop.findFirst({
-    where: { ownerId: user.id },
-    orderBy: { createdAt: "asc" },
+  await requireUser();
+  const shopId = await currentShopId();
+  const shop = shopId === null ? null : await prisma.shop.findUnique({
+    where: { id: shopId },
     include: {
       run: { include: { steps: true } },
       versions: { orderBy: { createdAt: "desc" }, take: 1 },

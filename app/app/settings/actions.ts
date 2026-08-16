@@ -3,10 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { requireShopId } from "@/lib/shop";
 import { createDraft, publishVersion, rollbackTo, type DraftResult } from "@/lib/versioning";
 
-async function myShop(userId: string) {
-  const shop = await prisma.shop.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: "asc" } });
+// Which shop is resolved centrally (lib/shop.currentShopId) so the multi-shop
+// fix lands in one place; this only adds the "must exist" rule.
+async function myShop(_userId: string) {
+  const id = await requireShopId();
+  const shop = await prisma.shop.findUnique({ where: { id } });
   if (!shop) throw new Error("No shop found.");
   return shop;
 }

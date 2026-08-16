@@ -66,6 +66,13 @@ console (Schedules → Create) pointing at your deployed app:
   Emails owners: escalating past-due dunning (day 3 + day 7; day 1 fires live) and
   a one-time nudge to anyone stalled mid-onboarding past `ONBOARDING_NUDGE_DAYS`
   (default 2). Never pauses service — cancellation is the only hard stop.
+- **Agent config drift** — cron `0 9 * * *` → `POST {APP_URL}/api/jobs/agent-drift`
+  Compares every live agent against the code: registered tools, post-call
+  analysis fields, and the prompt's baked guardrail sections. Catches config
+  that only ever reached newly-provisioned shops — tools and analysis fields
+  were both sent at agent creation and never on update, and neither failure was
+  visible from inside the app. Reports as a **warning**: a drifted shop is
+  missing an improvement, not offline.
 - **Customer rollups** — cron `30 8 * * *` (daily 8:30am UTC) → `POST {APP_URL}/api/jobs/customer-rollups`
   Reconciles customer call/booking counts, lifetime value and stage against the
   source rows. The live paths refresh these inline but best-effort (a CRM write

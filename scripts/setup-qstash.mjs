@@ -29,6 +29,9 @@ const DESIRED = [
   // only thing that can ever move a customer to "dormant" — that transition
   // happens by the passage of time, so no write triggers it.
   { cron: "30 8 * * *", path: "/api/jobs/customer-rollups" },
+  // Does every live agent still match the code? Catches config that only ever
+  // reached newly-provisioned shops — which has happened twice.
+  { cron: "0 9 * * *", path: "/api/jobs/agent-drift" },
 ];
 
 const auth = { Authorization: `Bearer ${token}` };

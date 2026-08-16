@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { Shop, CallRecord } from "@prisma/client";
-import { type DashboardData, type Delta, type SeriesPoint, type Period, formatMoney } from "@/lib/stats";
+import type { Shop } from "@prisma/client";
+import { type DashboardData, type Delta, type SeriesPoint, type Period, type RecentCall, formatMoney } from "@/lib/stats";
 import { PauseSwitch } from "./pause-switch";
 import { openBillingPortal } from "./subscribe/actions";
 
@@ -38,7 +38,7 @@ function A2pChip({ status }: { status: string | null }) {
   return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${s.tone}`}>{s.label}</span>;
 }
 
-export function Dashboard({ shop, data, calls, period }: { shop: Shop; data: DashboardData; calls: CallRecord[]; period: Period }) {
+export function Dashboard({ shop, data, calls, period }: { shop: Shop; data: DashboardData; calls: RecentCall[]; period: Period }) {
   const paused = shop.status === "paused";
   const s = data.current;
 
@@ -143,7 +143,18 @@ export function Dashboard({ shop, data, calls, period }: { shop: Shop; data: Das
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/70">
                       <td className="whitespace-nowrap px-5 py-3 text-slate-600">{fmtTime(c.timestamp)}</td>
-                      <td className="whitespace-nowrap px-5 py-3 tabular-nums text-slate-600">{c.callerPhone ?? "—"}</td>
+                      {/* Link straight through to the customer record. Without
+                          this the dashboard and the CRM are two products that
+                          happen to share a database. */}
+                      <td className="whitespace-nowrap px-5 py-3 tabular-nums text-slate-600">
+                        {c.customerId ? (
+                          <Link href={`/app/customers/${c.customerId}`} className="text-brand-700 hover:underline">
+                            {c.customerName ?? c.callerPhone ?? "—"}
+                          </Link>
+                        ) : (
+                          (c.callerPhone ?? "—")
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-slate-600">{c.intent ?? "—"}</td>
                       <td className="px-5 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${chip.chip}`}>{chip.label}</span>

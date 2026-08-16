@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setStage, saveNote, addTag, removeTag, addAsset, removeAsset, addTimelineNote, closeOutBooking } from "../actions";
+import { setStage, saveNote, addTag, removeTag, addAsset, removeAsset, addTimelineNote, closeOutBooking, updateProfile } from "../actions";
 
 // Client controls for the customer detail page. Each one calls a server action
 // and lets `revalidatePath` refresh the server-rendered data, so none of these
@@ -22,6 +22,147 @@ function useAction() {
 }
 
 const STAGES = ["lead", "active", "dormant", "lost"] as const;
+
+/**
+ * Editable name in the page header.
+ *
+ * The single most important control on this page: without it the list is a
+ * column of phone numbers an owner can't do anything about. Click-to-edit
+ * rather than a form, because naming someone should cost one click from the
+ * profile you're already looking at.
+ */
+export function NameEditor({
+  customerId,
+  displayName,
+  fallback,
+}: {
+  customerId: string;
+  displayName: string | null;
+  fallback: string;
+}) {
+  const { pending, error, run } = useAction();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(displayName ?? "");
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <h1 className="font-display text-2xl font-bold text-slate-900">{displayName ?? fallback}</h1>
+        <button
+          type="button"
+          onClick={() => {
+            setValue(displayName ?? "");
+            setEditing(true);
+          }}
+          className="rounded px-1.5 py-0.5 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+        >
+          {displayName ? "Rename" : "+ Add name"}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        run(async () => {
+          const r = await updateProfile(customerId, { displayName: value });
+          if (r.ok) setEditing(false);
+          return r;
+        });
+      }}
+    >
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Customer name"
+        autoFocus
+        className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xl font-semibold text-slate-900 focus:border-brand-500 focus:outline-none"
+      />
+      <button type="submit" disabled={pending} className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-800 disabled:opacity-50">
+        {pending ? "…" : "Save"}
+      </button>
+      <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:text-slate-800">
+        Cancel
+      </button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
+    </form>
+  );
+}
+
+/** Contact details — in the schema since day one, never editable until now. */
+export function ContactFields({
+  customerId,
+  email,
+  addressLine,
+  city,
+  postalCode,
+}: {
+  customerId: string;
+  email: string | null;
+  addressLine: string | null;
+  city: string | null;
+  postalCode: string | null;
+}) {
+  const { pending, error, run } = useAction();
+  const [f, setF] = useState({
+    email: email ?? "",
+    addressLine: addressLine ?? "",
+    city: city ?? "",
+    postalCode: postalCode ?? "",
+  });
+  const [saved, setSaved] = useState(false);
+  const dirty =
+    f.email !== (email ?? "") || f.addressLine !== (addressLine ?? "") || f.city !== (city ?? "") || f.postalCode !== (postalCode ?? "");
+
+  const field = (k: keyof typeof f, label: string, placeholder: string, type = "text") => (
+    <label className="block">
+      <span className="text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+      <input
+        type={type}
+        value={f[k]}
+        onChange={(e) => {
+          setF({ ...f, [k]: e.target.value });
+          setSaved(false);
+        }}
+        placeholder={placeholder}
+        className="mt-0.5 w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <div className="space-y-2">
+      {field("email", "Email", "name@example.com", "email")}
+      {field("addressLine", "Address", "412 Oak St")}
+      <div className="grid grid-cols-2 gap-2">
+        {field("city", "City", "Austin")}
+        {field("postalCode", "ZIP", "78704")}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={pending || !dirty}
+          onClick={() =>
+            run(async () => {
+              const r = await updateProfile(customerId, f);
+              if (r.ok) setSaved(true);
+              return r;
+            })
+          }
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-40"
+        >
+          {pending ? "Saving…" : "Save details"}
+        </button>
+        {saved && !dirty && <span className="text-xs text-green-600">Saved</span>}
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
 
 export function StageSelect({ customerId, stage }: { customerId: string; stage: string }) {
   const { pending, error, run } = useAction();

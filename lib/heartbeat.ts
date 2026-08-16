@@ -20,7 +20,8 @@ export type JobName =
   | "reclaim-numbers"
   | "health-check"
   | "weekly-digest"
-  | "customer-rollups";
+  | "customer-rollups"
+  | "agent-drift";
 
 const HEARTBEAT_URLS: Record<JobName, string | undefined> = {
   "onboarding-sweep": process.env.HEARTBEAT_URL_ONBOARDING_SWEEP,
@@ -30,6 +31,7 @@ const HEARTBEAT_URLS: Record<JobName, string | undefined> = {
   "health-check": process.env.HEARTBEAT_URL_HEALTH_CHECK,
   "weekly-digest": process.env.HEARTBEAT_URL_WEEKLY_DIGEST,
   "customer-rollups": process.env.HEARTBEAT_URL_CUSTOMER_ROLLUPS,
+  "agent-drift": process.env.HEARTBEAT_URL_AGENT_DRIFT,
 };
 
 /** Tell Checkly this job completed. Never throws. */

@@ -129,6 +129,8 @@ export default async function CustomersPage({
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Customer</th>
+                  <th className="px-4 py-2.5 font-medium">{shop.vertical?.startsWith("auto") ? "Vehicle" : "Property"}</th>
+                  <th className="px-4 py-2.5 font-medium">Last service</th>
                   <th className="px-4 py-2.5 font-medium">Stage</th>
                   <th className="px-4 py-2.5 text-right font-medium">Calls</th>
                   <th className="px-4 py-2.5 text-right font-medium">Jobs</th>
@@ -153,6 +155,12 @@ export default async function CustomersPage({
                           </span>
                         )}
                       </Link>
+                    </td>
+                    <td className="max-w-[11rem] truncate px-4 py-3 text-slate-600">
+                      {c.asset ?? <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="max-w-[12rem] truncate px-4 py-3 text-slate-600">
+                      {c.lastService ?? <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STAGE_CHIP[c.stage] ?? STAGE_CHIP.lead}`}>{c.stage}</span>

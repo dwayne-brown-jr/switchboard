@@ -97,6 +97,24 @@ describe("fillTemplate leaves no {TOKEN} unsubstituted", () => {
       expect(unresolvedTokens(prompt), `unsubstituted in ${v}`).toEqual([]);
     });
 
+    it(`${v}: keeps Retell's {{user_number}} intact`, () => {
+      // Double-brace variables are substituted by RETELL at call time, not by
+      // fillTemplate. The agent needs this one to have any value to pass to
+      // lookup_customer's required `phone` arg — its absence is why the first
+      // live test called no tool at all. It must survive rendering verbatim,
+      // and must NOT be reported as an unresolved {TOKEN}.
+      const prompt = fillTemplate({ ...config, vertical: v } as never);
+      expect(prompt).toContain("{{user_number}}");
+      expect(unresolvedTokens(prompt)).toEqual([]);
+    });
+
+    it(`${v}: never tells the agent to act BEFORE the greeting`, () => {
+      // Retell speaks begin_message before the model runs, so any instruction
+      // to do something "before you greet" is unfollowable by construction.
+      const prompt = fillTemplate({ ...config, vertical: v } as never);
+      expect(prompt).not.toMatch(/[Bb]efore you greet/);
+    });
+
     it(`${v}: the appended guardrail sections are present AND rendered`, () => {
       const prompt = fillTemplate({ ...config, vertical: v } as never);
       // Both sections are appended after the template, so they're exactly the

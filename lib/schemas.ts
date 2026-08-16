@@ -141,6 +141,9 @@ export const callIngestSchema = z.object({
   transcript_url: z.string().optional().nullable(),
   summary: z.string().optional().nullable(),
   transcript: z.string().optional().nullable(),
+  // The vehicle/property the call was about, from post-call analysis. Becomes a
+  // CustomerAsset so returning callers don't have to recite it again.
+  asset: z.string().optional().nullable(),
   flags: z.any().optional(),
 });
 

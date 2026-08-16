@@ -192,3 +192,44 @@ describe("relativeMonths — phrasing a person would say", () => {
     expect(relativeMonths(ago(365 * 3), now)).toBe("over 3 years ago");
   });
 });
+
+describe("callerPhoneFromToolBody — the shape Retell actually sends", () => {
+  let callerPhoneFromToolBody: typeof import("./caller-context").callerPhoneFromToolBody;
+  beforeAll(async () => {
+    callerPhoneFromToolBody = (await import("./caller-context")).callerPhoneFromToolBody;
+  });
+
+  it("reads the argument out of `args`, where Retell nests it", () => {
+    // The bug this exists for: the route read body.phone directly, which is
+    // always undefined. A real call invoked the tool with the correct number
+    // and still got known:false, because the route discarded it. Verified
+    // against a live transcript: arguments arrived as {"phone":"+1..."} under
+    // `args`, and app/api/agent/create-booking already handled that shape.
+    expect(callerPhoneFromToolBody({ name: "lookup_customer", args: { phone: "+14106934140" } })).toBe("+14106934140");
+  });
+
+  it("prefers the telephony from_number over whatever the model passed", () => {
+    // Call metadata is ground truth; the argument is the model repeating back a
+    // value it was told, and it can be wrong.
+    const body = { call: { from_number: "+14106934140" }, args: { phone: "+19999999999" } };
+    expect(callerPhoneFromToolBody(body)).toBe("+14106934140");
+  });
+
+  it("falls back to call metadata when the model omits the argument entirely", () => {
+    expect(callerPhoneFromToolBody({ call: { from_number: "+14106934140" }, args: {} })).toBe("+14106934140");
+  });
+
+  it("still accepts a flat body, so a simpler caller isn't broken", () => {
+    expect(callerPhoneFromToolBody({ phone: "+14106934140" })).toBe("+14106934140");
+  });
+
+  it("returns null rather than a junk value when there's nothing usable", () => {
+    for (const body of [{}, null, undefined, { args: {} }, { args: { phone: "" } }, { args: { phone: "   " } }, { call: {} }]) {
+      expect(callerPhoneFromToolBody(body)).toBeNull();
+    }
+  });
+
+  it("ignores a non-string argument instead of coercing it", () => {
+    expect(callerPhoneFromToolBody({ args: { phone: 14106934140 } })).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authAgentShop } from "@/lib/agentAuth";
 import { rateLimit } from "@/lib/ratelimit";
-import { lookupCallerContext } from "@/lib/caller-context";
+import { lookupCallerContext, callerPhoneFromToolBody } from "@/lib/caller-context";
 
 // Agent tool: recognise a returning caller.
 //
@@ -25,9 +25,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = (await req.json().catch(() => ({}))) as { phone?: string; from_number?: string };
-    const phone = body.phone ?? body.from_number ?? null;
-
+    const body = await req.json().catch(() => ({}));
+    const phone = callerPhoneFromToolBody(body);
     const ctx = await lookupCallerContext(shop.id, phone);
     return NextResponse.json(ctx);
   } catch (e) {

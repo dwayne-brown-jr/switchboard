@@ -233,17 +233,34 @@ export function unresolvedTokens(prompt: string): string[] {
 // written into each of the six templates so the behaviour — and the privacy
 // rules around it — can only ever be changed in one place.
 //
-// The failure this is written to prevent is dead air. A caller hears silence
-// long before they notice a missing personal touch, so every instruction below
-// biases toward greeting immediately and treating recognition as a bonus.
+// ---------------------------------------------------------------------------
+// WHY THIS SAYS "AFTER YOUR GREETING" AND NOT "BEFORE"
+// ---------------------------------------------------------------------------
+// The first draft told the agent to look the caller up BEFORE greeting them.
+// That is impossible on Retell: the opening line is `begin_message`, a static
+// string the platform speaks verbatim before the model gets control. The model
+// cannot act earlier than a message it never generates. On the first live test
+// the agent read the stock greeting and called no tool at all.
+//
+// It also has to be TOLD the caller's number. {{user_number}} is Retell's
+// built-in variable for it (from_number on an inbound call) and is substituted
+// at call time, not by fillTemplate — hence double braces, which our {TOKEN}
+// check deliberately ignores. Without it the model has no value for the tool's
+// required `phone` argument, which is the other half of why it skipped the call.
+//
+// So recognition lands one beat late: stock greeting, then a warm "oh — is this
+// <name>?" That is the honest version of this feature until the inbound-webhook
+// path (docs/CRM-PLAN.md) can personalise begin_message itself.
 const RETURNING_CALLER_SECTION = `
 
 RETURNING CALLER
-Before you greet the caller, call lookup_customer once with their caller ID. Never call it more than once, and never mention that you looked anything up.
-- If it returns known:false, or doesn't come back right away, just greet them normally as a new caller. Never wait in silence for it — greeting them late is worse than not recognising them.
-- If it returns a first name, greet them by it naturally, as a person who remembers them would: "Thanks for calling {BUSINESS_NAME}, is this <name>?"
+The caller's phone number is {{user_number}}.
+Right after your opening greeting, on your very first turn, call lookup_customer once with that number. Call it once and only once, and never mention that you looked anything up.
+- If it returns known:false, say nothing about it and carry on exactly as you would with a new caller.
+- If it returns a first name, work it in warmly on your next line, the way someone who remembers them would: "Oh — is this <name>?" Then carry on with what they need.
 - If it returns a last service or a vehicle/property, you may reference it once, lightly, to save them explaining: "Is this about the <item> again?" Ask — never assume that's why they're calling.
 - If it returns an upcoming appointment, mention it before offering any new time, so you never double-book them.
+- Never let this hold up the conversation. If the caller is already talking, answer them first — recognising them is a nice touch, not a step they have to wait through.
 - If the caller says it isn't them, or that you have the wrong person, drop every detail immediately, apologise briefly, and carry on as a brand-new caller. Do not use the name again.
 - Never read back anything beyond their first name and the item being serviced. Never state their phone number, address, what they've spent, or how many times they've called — you cannot be certain who is holding the phone.`;
 

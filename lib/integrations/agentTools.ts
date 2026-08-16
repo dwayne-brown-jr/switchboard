@@ -21,12 +21,15 @@ export function agentFunctions(shopId: string): AgentFunction[] {
     {
       name: "lookup_customer",
       url: `${base}/lookup-customer${q(shopId)}`,
+      // "Right after your greeting", not "before" — the opening line is
+      // Retell's static begin_message, which the platform speaks before the
+      // model runs. See the RETURNING CALLER section in lib/llm.ts.
       description:
-        "Look up whether this caller has dealt with us before, using their caller ID. Call this ONCE at the very start, before greeting them. If it returns known:false, greet them normally as a new caller — never mention that you looked.",
+        "Look up whether this caller has dealt with us before. Call this ONCE, on your first turn right after the opening greeting, passing the caller's number ({{user_number}}). If it returns known:false, carry on as with a new caller and never mention that you looked.",
       parameters: {
         type: "object",
         properties: {
-          phone: { type: "string", description: "The caller's phone number (their caller ID), in any format." },
+          phone: { type: "string", description: "The caller's phone number — use the {{user_number}} value, in any format." },
         },
         required: ["phone"],
       },

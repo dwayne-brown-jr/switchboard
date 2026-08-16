@@ -45,6 +45,30 @@ export interface CallerContext {
 const STALE_MONTHS = 24;
 
 /**
+ * Pull the caller's number out of a Retell custom-tool request body.
+ *
+ * Retell NESTS tool arguments under `args` — reading `body.phone` directly
+ * yields undefined, which is how the first working call still answered
+ * known:false: the agent invoked the tool with the right number and the route
+ * threw it away. `app/api/agent/create-booking` already handled this shape;
+ * this is the same idiom, extracted so it can be tested.
+ *
+ * `call.from_number` is preferred over the argument because it comes from the
+ * telephony layer rather than the model. The model can omit the argument,
+ * truncate it, or mis-transcribe it — and recognition shouldn't depend on it
+ * remembering to pass anything it was told.
+ */
+export function callerPhoneFromToolBody(body: unknown): string | null {
+  const b = (body ?? {}) as { args?: Record<string, unknown>; call?: { from_number?: unknown }; [k: string]: unknown };
+  const a = (b.args ?? b ?? {}) as Record<string, unknown>;
+  const candidates = [b.call?.from_number, a.phone, a.from_number];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c;
+  }
+  return null;
+}
+
+/**
  * Look up the caller for one shop. Returns `{ known: false }` for anything we
  * can't confidently answer — an unnormalizable number, a caller we've never
  * heard from, or a record too stale to be worth mentioning.

@@ -182,7 +182,7 @@ function hasAllSections(text: string): boolean {
 }
 
 export function fillTemplate(config: ShopConfig): string {
-  const template = TEMPLATES[config.vertical as Vertical];
+  const base = TEMPLATES[config.vertical as Vertical];
   const hoursText = Object.entries(config.hours)
     .map(([day, h]) => {
       const label = DAY_LABELS[day as keyof typeof DAY_LABELS];
@@ -203,6 +203,13 @@ export function fillTemplate(config: ShopConfig): string {
     config.hot_job_rules.map((r) => `- ${r}`).join("\n") || "- Any situation the caller describes as an emergency.";
   const bookingFieldsText = config.booking_fields.map(prettyField).join(", ");
 
+  // Compose FIRST, substitute second. The appended guardrail sections are part
+  // of the prompt and may contain {TOKENS} of their own; appending them after
+  // the replaceAll chain would ship the literal token to the agent — which is
+  // exactly what happened when RETURNING CALLER was added, and the receptionist
+  // went live telling callers "Thanks for calling {BUSINESS_NAME}".
+  const template = base + RETURNING_CALLER_SECTION + HANDOFF_SECTION;
+
   const filled = template
     .replaceAll("{BUSINESS_NAME}", config.business_name ?? "the shop")
     .replaceAll("{CITY}", config.city ?? "the local area")
@@ -214,7 +221,12 @@ export function fillTemplate(config: ShopConfig): string {
     .replaceAll("{HOT_JOBS}", hotJobsText)
     .replaceAll("{BOOKING_FIELDS}", bookingFieldsText)
     .replaceAll("{ESCALATION_PHONE}", config.escalation.alert_number ?? "the shop owner");
-  return filled + RETURNING_CALLER_SECTION + HANDOFF_SECTION;
+  return filled;
+}
+
+/** Any {TOKEN} left unsubstituted in a prompt. Empty means fully rendered. */
+export function unresolvedTokens(prompt: string): string[] {
+  return [...new Set(prompt.match(/\{[A-Z_]+\}/g) ?? [])];
 }
 
 // Baked returning-caller guardrail (all verticals). Appended here rather than

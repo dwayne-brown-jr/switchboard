@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { VERTICALS, VERTICAL_DEFS, verticalDef } from "./verticals";
 import { TEMPLATES } from "./templates";
+import { fillTemplate, unresolvedTokens } from "./llm";
 import { fuzzyMatchKey } from "./match-service";
 
 // Cross-vertical sanity: every advertised business type must have a complete,
@@ -61,4 +62,49 @@ describe("verticalDef fallback", () => {
   it("returns the right definition for every known vertical", () => {
     for (const v of VERTICALS) expect(verticalDef(v).id).toBe(v);
   });
+});
+
+describe("fillTemplate leaves no {TOKEN} unsubstituted", () => {
+  // Regression guard, added after a live agent shipped a prompt telling callers
+  // "Thanks for calling {BUSINESS_NAME}".
+  //
+  // The cause was ordering, not a typo: fillTemplate ran its replaceAll chain on
+  // the vertical template and THEN appended the RETURNING CALLER and HANDING OFF
+  // guardrail sections, so any token inside those appended blocks was never
+  // reachable by the substitution. Nothing failed — the prompt just went out
+  // with a curly-brace placeholder the receptionist read aloud.
+  //
+  // Asserting across every vertical, on the FULLY composed prompt, is what makes
+  // that unrepeatable.
+  const config = {
+    vertical: "auto",
+    business_name: "Riverside Auto Care",
+    city: "Austin",
+    service_area: "Greater Austin",
+    greeting: "Thanks for calling!",
+    hours: { mon: { open: "08:00", close: "17:00", closed: false } },
+    services: [{ service: "Oil change", bookable: true }],
+    price_ranges: {} as Record<string, string>,
+    faqs: [{ q: "Do you do brakes?", a: "Yes." }],
+    hot_job_rules: ["Smoke from the engine"],
+    booking_fields: ["customer_name", "phone", "preferred_time"],
+    escalation: { alert_number: "+15125550100" },
+  };
+
+  for (const v of VERTICALS) {
+    it(`${v}: renders with no leftover placeholder`, () => {
+      const prompt = fillTemplate({ ...config, vertical: v } as never);
+      expect(unresolvedTokens(prompt), `unsubstituted in ${v}`).toEqual([]);
+    });
+
+    it(`${v}: the appended guardrail sections are present AND rendered`, () => {
+      const prompt = fillTemplate({ ...config, vertical: v } as never);
+      // Both sections are appended after the template, so they're exactly the
+      // blocks the ordering bug hid.
+      expect(prompt).toContain("RETURNING CALLER");
+      expect(prompt).toContain("HANDING OFF TO A PERSON");
+      expect(prompt).toContain("Riverside Auto Care");
+      expect(prompt).not.toContain("{BUSINESS_NAME}");
+    });
+  }
 });
